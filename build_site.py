@@ -76,12 +76,17 @@ RESULTS = '<section class="tab" id="tab-results"><div class="notes" style="margi
     "loss for those updates instead. All four are evaluated on the same 64 clips from validation participants, one "
     "sample per clip and task with the clip's fixed seed; intervals are 95% clip-bootstrap intervals. Bold marks the "
     "best value in a column of the last three tables.</div>") + '<div class="charts">' + "".join([
-    table("Cross-modal reliance (%)",
-          "How much each stream's denoising error falls when the other modality is given clean instead of hidden under "
-          "noise, at four fixed noise levels (higher = more reliance).",
-          ["Video uses motion", "Motion uses video"],
-          [["2.2 [1.8, 2.6]", "4.0 [2.6, 5.5]"], ["2.5 [2.1, 2.8]", "3.6 [2.5, 4.9]"],
-           ["2.6 [2.2, 3.0]", "3.0 [1.1, 4.5]"], ["2.9 [2.5, 3.3]", "2.8 [1.9, 3.7]"]]),
+    table("Cross-modal reliance",
+          "How much closer each stream's sample lands to the recording when it is given the recorded other modality "
+          "instead of generating both: the rotation error (&deg;, relative to the first frame) against the recorded "
+          "head of VGGT-&Omega;'s camera on the video, and of the generated head, jointly and given the other modality. "
+          "Removed is the share of the joint error that the given modality removes.",
+          ["Joint", "Given", "Removed (%)", "Joint", "Given", "Removed (%)"],
+          [["39.4", "15.8", "60 [53, 66]", "40.2", "29.7", "26 [20, 32]"],
+           ["35.3", "14.8", "58 [48, 66]", "38.6", "31.4", "19 [14, 23]"],
+           ["33.5", "14.1", "58 [51, 64]", "34.6", "27.6", "20 [13, 27]"],
+           ["34.2", "14.1", "59 [50, 65]", "37.3", "29.6", "21 [14, 28]"]],
+          groups=[("Video uses motion", 3), ("Motion uses video", 3)]),
     table("Rotation error (&deg;)",
           "Relative to the first frame (lower is better): the joint video's camera against the joint head "
           "(self-consistency); the generated head against the recorded head given the real video; the generated "
