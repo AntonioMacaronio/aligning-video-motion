@@ -77,16 +77,17 @@ RESULTS = '<section class="tab" id="tab-results"><div class="notes" style="margi
     "sample per clip and task with the clip's fixed seed; intervals are 95% clip-bootstrap intervals. Bold marks the "
     "best value in a column of the last three tables.</div>") + '<div class="charts">' + "".join([
     table("Cross-modal reliance",
-          "How much closer each stream's sample lands to the recording when it is given the recorded other modality "
-          "instead of generating both: the rotation error (&deg;, relative to the first frame) against the recorded "
-          "head of VGGT-&Omega;'s camera on the video, and of the generated head, jointly and given the other modality. "
-          "Removed is the share of the joint error that the given modality removes.",
-          ["Joint", "Given", "Removed (%)", "Joint", "Given", "Removed (%)"],
-          [["39.4", "15.8", "60 [53, 66]", "40.2", "29.7", "26 [20, 32]"],
-           ["35.3", "14.8", "58 [48, 66]", "38.6", "31.4", "19 [14, 23]"],
-           ["33.5", "14.1", "58 [51, 64]", "34.6", "27.6", "20 [13, 27]"],
-           ["34.2", "14.1", "59 [50, 65]", "37.3", "29.6", "21 [14, 28]"]],
-          groups=[("Video uses motion", 3), ("Motion uses video", 3)]),
+          "Each clip's conditioned sample (the video given the recorded motion, or the motion given the real video) "
+          "against the joint sample from the same seed. Moved is the distance between the two; error is the distance "
+          "from the recording, of the joint sample &rarr; of the conditioned sample. Video: rotations between "
+          "VGGT-&Omega;'s cameras relative to the first frame, against the camera from the recorded video. Motion: "
+          "body joint positions and head rotations. A stream that ignored the given modality would move 0.",
+          ["Moved", "Error", "Moved", "Error", "Moved", "Error"],
+          [["39.0", "41.0 &rarr; 15.7", "9.4", "44.6 &rarr; 41.6", "21.1", "40.7 &rarr; 30.1"],
+           ["34.4", "37.2 &rarr; 14.8", "6.9", "44.2 &rarr; 42.8", "14.6", "39.0 &rarr; 31.8"],
+           ["30.5", "34.9 &rarr; 13.8", "12.6", "41.5 &rarr; 39.3", "18.9", "35.0 &rarr; 28.0"],
+           ["34.4", "34.8 &rarr; 14.9", "15.1", "53.9 &rarr; 47.6", "22.8", "37.8 &rarr; 29.9"]],
+          groups=[("Video: camera (&deg;)", 2), ("Motion: body (cm)", 2), ("Motion: head (&deg;)", 2)]),
     table("Rotation error (&deg;)",
           "Relative to the first frame (lower is better): the joint video's camera against the joint head "
           "(self-consistency); the generated head against the recorded head given the real video; the generated "
