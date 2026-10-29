@@ -1,0 +1,1 @@
+{"position": [-0.534, -3.358, 1.5], "look_at": [0.0, 0.0, 0.9], "up": [0.0, 0.0, 1.0], "side_by_side": {"/gt": [-1.086, 0.173, -0.0], "/joint": [0.0, -0.0, 0.0], "/video_cond": [1.086, -0.173, 0.0]}, "frames": 145, "vggt": true, "identity": true, "megabytes": 12.27}
