@@ -163,7 +163,7 @@ SITENAV_CSS = (".sitenav { background: #fff; border-bottom: 1px solid #ddd; padd
 
 
 def sitenav(active):
-    links = (("index.html", "Thesis figures", "figures"), ("gallery.html", "All samples", "gallery"),
+    links = (("index.html", "Thesis figures", "figures"), ("gallery.html", "More samples", "gallery"),
              ("gallery.html#results", "Results", "results"))
     marked = ' class="active"'
     return '<div class="sitenav">' + "".join(
@@ -243,7 +243,7 @@ over the clip inside a VGGT-&Omega; point cloud of the video. As in the thesis f
 blue to purple over the clip <span class="ramp"></span>, and the video's border follows the same colors. The point cloud is placed
 with the motion's own camera trajectory, so the body and the scene agree only as far as the video and the motion do, and the
 body's head follows the orientation of the Aria glasses. Each scene opens at its figure's camera; drag to orbit.</p>
-<p><a href="gallery.html">All samples</a> has the evaluation's 64 clips with every task, the recorded motion and VGGT-&Omega;'s
+<p><a href="gallery.html">More samples</a> has the evaluation's 64 clips with every task, the recorded motion and VGGT-&Omega;'s
 cameras; <a href="gallery.html#results">Results</a> has the thesis's quantitative comparison of the training phases.</p>
 </div>
 </header>
