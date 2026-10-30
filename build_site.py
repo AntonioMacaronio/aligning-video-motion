@@ -75,23 +75,12 @@ RESULTS = '<section class="tab" id="tab-results"><div class="notes" style="margi
     "post-training, and with both (the final model). A model that leaves out a phase trains on the joint-finetuning "
     "loss for those updates instead. All four are evaluated on the same 64 clips from validation participants, one "
     "sample per clip and task with the clip's fixed seed; intervals are 95% clip-bootstrap intervals. Bold marks the "
-    "best value in a column of the last three tables.</div>") + '<div class="charts">' + "".join([
-    table("Cross-modal reliance",
-          "Each clip's conditioned sample (the video given the recorded motion, or the motion given the real video) "
-          "against the joint sample from the same seed. Moved is the distance between the two; error is the distance "
-          "from the recording, of the joint sample &rarr; of the conditioned sample. Video: rotations between "
-          "VGGT-&Omega;'s cameras relative to the first frame, against the camera from the recorded video. Motion: "
-          "body joint positions and head rotations. A stream that ignored the given modality would move 0.",
-          ["Moved", "Error", "Moved", "Error", "Moved", "Error"],
-          [["39.0", "41.0 &rarr; 15.7", "9.4", "44.6 &rarr; 41.6", "21.1", "40.7 &rarr; 30.1"],
-           ["34.4", "37.2 &rarr; 14.8", "6.9", "44.2 &rarr; 42.8", "14.6", "39.0 &rarr; 31.8"],
-           ["30.5", "34.9 &rarr; 13.8", "12.6", "41.5 &rarr; 39.3", "18.9", "35.0 &rarr; 28.0"],
-           ["34.4", "34.8 &rarr; 14.9", "15.1", "53.9 &rarr; 47.6", "22.8", "37.8 &rarr; 29.9"]],
-          groups=[("Video: camera (&deg;)", 2), ("Motion: body (cm)", 2), ("Motion: head (&deg;)", 2)]),
+    "best value in each column.</div>") + '<div class="charts">' + "".join([
     table("Rotation error (&deg;)",
           "Relative to the first frame (lower is better): the joint video's camera against the joint head "
           "(self-consistency); the generated head against the recorded head given the real video; the generated "
-          "video's camera against the recorded head given the real motion.",
+          "video's camera against the recorded head given the real motion. VGGT-&Omega;'s camera from the "
+          "recorded video lies 3.8&deg; from the recorded head, the lowest error the camera-based columns can reach.",
           ["Self-consistency", "Video-conditioned", "Motion-conditioned"],
           [["21.5", "29.7", "15.8"], ["19.5", "31.4", "14.8"], ["18.6", "<b>27.6</b>", "<b>14.1</b>"],
            ["<b>16.7</b>", "29.6", "<b>14.1</b>"]]),
