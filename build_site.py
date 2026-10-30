@@ -197,8 +197,7 @@ for mode, heading, note, video_label, motion_label in TASKS:
             f'<div class="example"><h3>{html.escape(e["title"])}{tag}</h3>'
             f'<p class="caption">{html.escape(e["caption"])}</p><div class="body">'
             f'<div class="video"><p class="panel-label">{video_label}</p>'
-            f'<video src="media/thesis/{e["name"]}.mp4" muted loop playsinline preload="metadata"></video>'
-            f'<button class="replay">restart video</button></div>'
+            f'<video src="media/thesis/{e["name"]}.mp4" muted loop playsinline preload="auto"></video></div>'
             f'<div class="motion"><p class="panel-label">{motion_label}</p>'
             f'<div class="scene" style="aspect-ratio: {info["aspect"]:.3f}"><div class="hint">loading the 3D scene&hellip;</div>'
             f'<iframe data-src="viser/index.html?playbackPath=../recordings/thesis/{e["name"]}.viser&amp;{camera}" '
@@ -222,7 +221,6 @@ h2 {{ font-size: 17px; margin: 22px 0 2px; }}
 .example .body {{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.25fr); gap: 14px; align-items: start; }}
 .panel-label {{ font-size: 12px; color: #444; margin: 0 0 4px; font-weight: 600; }}
 .video video {{ width: 100%; display: block; box-sizing: border-box; border: 6px solid rgb(46,184,114); border-radius: 6px; background: #000; }}
-.replay {{ font-size: 12px; margin-top: 6px; padding: 3px 10px; cursor: pointer; }}
 .scene {{ position: relative; background: #fff; border: 1px solid #e3e3e3; border-radius: 6px; overflow: hidden; }}
 .scene iframe {{ position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }}
 .scene .hint {{ position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #889; font-size: 13px; pointer-events: none; }}
@@ -242,7 +240,8 @@ and geometric post-training. These are the examples of the thesis's Section 4.4,
 over the clip inside a VGGT-&Omega; point cloud of the video. As in the thesis figures, the body's color moves from green through
 blue to purple over the clip <span class="ramp"></span>, and the video's border follows the same colors. The point cloud is placed
 with the motion's own camera trajectory, so the body and the scene agree only as far as the video and the motion do, and the
-body's head follows the orientation of the Aria glasses. Each scene opens at its figure's camera; drag to orbit.</p>
+body's head follows the orientation of the Aria glasses. Each scene opens at its figure's camera; drag to orbit. The video
+follows the scene's play bar, so pausing or scrubbing a scene moves its video with it.</p>
 <p><a href="gallery.html">More samples</a> has the evaluation's 64 clips with every task, the recorded motion and VGGT-&Omega;'s
 cameras; <a href="gallery.html#results">Results</a> has the thesis's quantitative comparison of the training phases.</p>
 </div>
@@ -257,19 +256,45 @@ function ramp(f) {{
   const x = Math.min(Math.max(f, 0), 1) * (RAMP.length - 1), i = Math.min(Math.floor(x), RAMP.length - 2), t = x - i;
   return "rgb(" + RAMP[i].map((c, k) => Math.round(c + t * (RAMP[i + 1][k] - c))).join(",") + ")";
 }}
-const videos = [...document.querySelectorAll("video")];
+// Each video follows its scene's playback clock. The viewer (same origin) shows its playback time on its timeline
+// slider (aria-valuenow), and video frame k is motion frame 3k, so the video shows frame floor(10 t). Until a scene
+// has loaded, its video plays on its own.
+const VIDEO_FPS = 10, LAST_FRAME = 48;
+const rows = [...document.querySelectorAll(".example")].map((row) => ({{
+  video: row.querySelector("video"), frame: row.querySelector("iframe"), shown: -1, visible: false,
+}}));
+function sceneTime(frame) {{
+  if (!frame.dataset.loaded) return null;
+  try {{
+    const slider = frame.contentDocument && frame.contentDocument.querySelector('[role="slider"][aria-valuemax]');
+    const t = slider ? parseFloat(slider.getAttribute("aria-valuenow")) : NaN;
+    return Number.isFinite(t) ? t : null;
+  }} catch (error) {{
+    return null;
+  }}
+}}
 function tick() {{
-  for (const v of videos) if (v.duration) v.style.borderColor = ramp(v.currentTime / v.duration);
+  for (const r of rows) {{
+    const v = r.video, t = sceneTime(r.frame);
+    if (t !== null && v.readyState >= 1) {{
+      if (!v.paused) v.pause();
+      const k = Math.min(Math.max(Math.floor(t * VIDEO_FPS + 1e-6), 0), LAST_FRAME);
+      if (k !== r.shown) {{ v.currentTime = (k + 0.5) / VIDEO_FPS; r.shown = k; }}
+      v.style.borderColor = ramp(k / LAST_FRAME);  // the body's color at motion frame 3k
+    }} else {{
+      if (r.shown !== -1) {{ r.shown = -1; if (r.visible) v.play().catch(() => {{}}); }}
+      if (v.duration) v.style.borderColor = ramp(v.currentTime / v.duration);
+    }}
+  }}
   requestAnimationFrame(tick);
 }}
 requestAnimationFrame(tick);
 const seen = new IntersectionObserver((entries) => entries.forEach((e) => {{
-  if (e.isIntersecting) e.target.play().catch(() => {{}}); else e.target.pause();
+  const r = rows.find((row) => row.video === e.target);
+  r.visible = e.isIntersecting;
+  if (r.shown === -1) {{ if (e.isIntersecting) e.target.play().catch(() => {{}}); else e.target.pause(); }}
 }}), {{ threshold: 0.25 }});
-videos.forEach((v) => seen.observe(v));
-document.querySelectorAll(".replay").forEach((b) => b.addEventListener("click", () => {{
-  const v = b.parentElement.querySelector("video"); v.currentTime = 0; v.play();
-}}));
+rows.forEach((r) => seen.observe(r.video));
 const MAX_LIVE = 4, live = [];
 function unload(frame) {{
   frame.src = "about:blank"; delete frame.dataset.loaded; frame.previousElementSibling.style.display = "";

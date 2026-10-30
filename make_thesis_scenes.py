@@ -1,7 +1,7 @@
 """Animated scenes of the thesis's Section 4.4 gallery for the site's main page.
 
     PYTHONPATH=<LVP tree with datasets/head_correction.py> python make_thesis_scenes.py \
-        <gallery dir> <figure-src gallery dir> <site dir> [name ...]
+        <gallery dir> <figure-src gallery dir> <site dir> [--videos-only] [name ...]
 
 <gallery dir> holds gallery_scene.py's scenes/<name>/{scene.npz,frames/} and the examples' inputs
 (<cohort>/motion/<clip>.pt); <figure-src gallery dir> is the thesis repo's figure-src/gallery-44-20261025
@@ -12,8 +12,10 @@ color ramp and occluder cut. For each of the twelve examples:
 - the body is the example's motion at every one of the 145 motion frames, posed with gallery_scene.py's recipe (the
   glasses-anchored head, the subject's identity, the joint rotations; checked against the scene's stored snapshots)
   and colored along the figure's green -> blue -> purple ramp by time;
-- the video is the example's 49 frames (scenes/<name>/frames) as a 10 fps mp4.
-Writes <site>/recordings/thesis/<name>.viser and .json (the figure camera) and <site>/media/thesis/<name>.mp4.
+- the video is the example's 49 frames (scenes/<name>/frames) as a 10 fps mp4 in which every frame is a keyframe,
+  because the page seeks it to the scene's playback time on every frame (video frame k = motion frame 3k).
+Writes <site>/recordings/thesis/<name>.viser and .json (the figure camera) and <site>/media/thesis/<name>.mp4;
+--videos-only rewrites just the videos.
 """
 import argparse
 import json
@@ -28,7 +30,8 @@ import viser.transforms as vtf
 from scipy.spatial import cKDTree
 
 GALLERY, FIGSRC, SITE = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
-NAMES = sys.argv[4:]
+VIDEOS_ONLY = "--videos-only" in sys.argv[4:]
+NAMES = [name for name in sys.argv[4:] if name != "--videos-only"]
 sys.path.insert(0, str(FIGSRC.parent / "data-figure-20261023"))
 from render_datafig import occluders, ramp  # noqa: E402  the figure's own color ramp and occluder cut
 
@@ -140,6 +143,13 @@ def figure_points(scene, args):
     return points, colors, middle, saved
 
 
+def encode_video(scene_dir, video):
+    """The example's 49 frames as a 10 fps H.264 mp4, all keyframes so that seeking to any frame is immediate."""
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-framerate", "10", "-i", str(scene_dir / "frames" / "%02d.jpg"),
+                    "-vf", "scale=640:640:flags=lanczos", "-c:v", "libx264", "-crf", "23", "-preset", "slow", "-g", "1",
+                    "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an", str(video)], check=True)
+
+
 def main():
     examples = json.loads((FIGSRC / "examples.json").read_text())
     views = json.loads((FIGSRC / "views.json").read_text())
@@ -152,6 +162,11 @@ def main():
         if NAMES and name not in NAMES:
             continue
         scene_dir = GALLERY / "scenes" / name
+        video = SITE / "media" / "thesis" / f"{name}.mp4"
+        if VIDEOS_ONLY:
+            encode_video(scene_dir, video)
+            print(name, f"video {video.stat().st_size / 1e6:.2f} MB", flush=True)
+            continue
         scene = dict(np.load(scene_dir / "scene.npz"))
         camera = FIGSRC / "cameras" / f"{name}.json"
         extras = views.get(name, views["default"])
@@ -200,10 +215,7 @@ def main():
                     megabytes=round(target.stat().st_size / 1e6, 2))
         target.with_suffix(".json").write_text(json.dumps(info))
 
-        video = SITE / "media" / "thesis" / f"{name}.mp4"
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-framerate", "10", "-i", str(scene_dir / "frames" / "%02d.jpg"),
-                        "-vf", "scale=640:640:flags=lanczos", "-c:v", "libx264", "-crf", "23", "-preset", "slow",
-                        "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an", str(video)], check=True)
+        encode_video(scene_dir, video)
         print(name, json.dumps(info), f"video {video.stat().st_size / 1e6:.2f} MB", flush=True)
         port += 1
 

@@ -10,7 +10,7 @@
   "name": "joint_2",
   "mode": "joint",
   "title": "Walking backwards on a road and kicking a ball",
-  "tag": "training-split clip",
+  "tag": "",
   "caption": "First Person POV: Walk backwards on the road. Subtly turn right. Walk forward and kick the ball with your right foot. Walk backwards."
  },
  {
@@ -52,7 +52,7 @@
   "name": "motion_cond_4",
   "mode": "motion_cond",
   "title": "Walking around a bed and picking up a scarf",
-  "tag": "training-split clip",
+  "tag": "",
   "caption": "First Person POV: Walk counterclockwise in the bedroom. Bend your body. Pick up the scarf on the bed with both hands."
  },
  {
@@ -73,14 +73,14 @@
   "name": "video_cond_3",
   "mode": "video_cond",
   "title": "Carrying a tray through a cafeteria",
-  "tag": "training-split clip",
+  "tag": "",
   "caption": "First Person POV: Walk along the cafeteria while holding the tray with both hands."
  },
  {
   "name": "video_cond_4",
   "mode": "video_cond",
   "title": "Turning and walking past a pool table in a garage",
-  "tag": "training-split clip",
+  "tag": "",
   "caption": "First Person POV: Turn left. Walk forward in the garage."
  }
 ]
