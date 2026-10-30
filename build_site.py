@@ -112,6 +112,10 @@ s = s.replace("</style></head>", ".results { border-collapse: collapse; width: 1
               ".results th, .results td { padding: 4px 8px; text-align: center; border-bottom: 1px solid #e5e5e5; }\n"
               ".results th { font-weight: 600; color: #333; }\n.byline { color: #555; margin: 2px 0 10px; }\n"
               "footer { color: #666; font-size: 12.5px; padding: 0 22px 30px; }\n</style></head>", 1)
+for old, new in (('<input type="radio" name="layout" value="overlay" checked>', '<input type="radio" name="layout" value="overlay">'),
+                 ('<input type="radio" name="layout" value="side">', '<input type="radio" name="layout" value="side" checked>')):
+    assert s.count(old) == 1, old
+    s = s.replace(old, new)   # side by side is the default 3D layout
 FOOTER = ("<footer>Data: NymeriaPlus, built on the Nymeria dataset of Project Aria recordings (Meta Reality Labs "
           "Research). Video model: HunyuanVideo&nbsp;1.5. Camera estimates: VGGT-&Omega;. 3D viewer: viser.</footer>")
 s = s.replace("<script>", FOOTER + "\n<script>", 1)
