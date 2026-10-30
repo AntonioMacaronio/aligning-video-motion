@@ -287,6 +287,10 @@ TASKS = {
 }
 SECTIONS = (("joint", "Figures 4.1 and 4.2"), ("motion_cond", "Figures 4.3 and 4.4"), ("video_cond", "Figures 4.5 and 4.6"))
 examples = json.loads((site / "thesis_examples.json").read_text())
+for video in sorted((site / "media" / "thesis").glob("*.mp4")):
+    poster = video.with_suffix(".jpg")
+    if not poster.exists() or poster.stat().st_mtime < video.stat().st_mtime:
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(video), "-frames:v", "1", "-q:v", "3", str(poster)], check=True)
 
 
 def pane(e, task, active):
@@ -297,10 +301,9 @@ def pane(e, task, active):
               f"&amp;initialCameraLookAt={','.join(map(str, info['look_at']))}&amp;initialCameraUp=0,0,1")
     t = TASKS[task]
     return (f'<div class="pane" data-task="{task}"{"" if active else " hidden"}><p class="task-note">{t["note"]}</p>'
-            f'<div class="body"><div class="video"><p class="panel-label">{t["video"]}</p>'
-            f'<video src="media/thesis/{name}.mp4" muted loop playsinline preload="none"></video></div>'
-            f'<div class="motion"><p class="panel-label">{t["motion"]}</p>'
-            f'<div class="scene" style="aspect-ratio: {info["aspect"]:.3f}">'
+            f'<div class="body" style="--aspect: {info["aspect"]:.3f}"><div class="video"><p class="panel-label">{t["video"]}</p>'
+            f'<video src="media/thesis/{name}.mp4" poster="media/thesis/{name}.jpg" muted loop playsinline preload="none">'
+            f'</video></div><div class="motion"><p class="panel-label">{t["motion"]}</p><div class="scene">'
             f'<div class="hint">the 3D scene loads when the example is fully on screen</div>'
             f'<iframe data-src="viser/index.html?playbackPath=../recordings/thesis/{name}.viser&amp;{camera}" '
             f'title="{html.escape(e["title"])}: {t["label"].lower()}"></iframe></div></div></div></div>')
@@ -320,15 +323,17 @@ MAIN = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Aligning Egocentric Video and Human Motion Generation</title>
 <meta name="viewport" content="width=device-width, initial-scale=1"><style>
 body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; margin: 0; color: #222; background: #f6f7f9; }}
-header {{ padding: 18px 28px 8px; background: #fff; border-bottom: 1px solid #ddd; }}
+/* One centred column: the nav links, the header, the examples and the footer share its left and right edges. */
+.wrap {{ max-width: 1400px; margin: 0 auto; padding-left: 24px; padding-right: 24px; box-sizing: border-box; }}
+header {{ padding: 18px 0 8px; background: #fff; border-bottom: 1px solid #ddd; }}
 h1 {{ font-size: 20px; margin: 0 0 6px; }}
 .byline {{ color: #555; margin: 2px 0 10px; }}
-.notes {{ font-size: 13px; line-height: 1.5; color: #444; max-width: 1400px; }}
-{SITENAV_CSS}.sitenav {{ position: sticky; top: 0; z-index: 10; }}
-main {{ padding: 4px 22px 30px; max-width: 1500px; }}
+.notes {{ font-size: 13px; line-height: 1.5; color: #444; }}
+{SITENAV_CSS}.sitenav {{ position: sticky; top: 0; z-index: 10; padding: 0 calc(max(0px, (100% - 1400px) / 2) + 10px); }}
+main {{ padding-top: 4px; padding-bottom: 30px; }}
 h2 {{ font-size: 17px; margin: 22px 0 8px; }}
 .figref {{ font-size: 12.5px; color: #777; font-weight: 400; margin-left: 6px; }}
-.example {{ background: #fff; border: 1px solid #ddd; border-radius: 8px; margin: 0 0 16px; padding: 10px 12px; }}
+.example {{ background: #fff; border: 1px solid #ddd; border-radius: 8px; margin: 0 0 16px; padding: 14px 16px; }}
 .example h3 {{ font-size: 14.5px; margin: 0 0 2px; }}
 .example .caption {{ font-size: 12.5px; color: #555; margin: 0 0 6px; }}
 .tabs {{ display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid #e3e3e3; margin: 0 0 8px; }}
@@ -336,18 +341,21 @@ h2 {{ font-size: 17px; margin: 22px 0 8px; }}
 .tabs button[aria-selected="true"] {{ color: #222; font-weight: 600; border-bottom-color: #3182bd; }}
 .fig-mark {{ font-size: 11px; color: #666; background: #eef0f3; border-radius: 3px; padding: 0 5px; margin-left: 4px; font-weight: 400; }}
 .task-note {{ font-size: 12.5px; color: #555; margin: 0 0 8px; }}
-.pane .body {{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.25fr); gap: 14px; align-items: start; }}
+/* The square video and the scene (aspect --aspect) split the width in proportion, so they come out the same height. */
+.pane .body {{ display: flex; gap: 14px; align-items: flex-start; }}
+.pane .video {{ flex: 1 1 0; min-width: 0; }}
+.pane .motion {{ flex: var(--aspect) 1 0; min-width: 0; }}
 .panel-label {{ font-size: 12px; color: #444; margin: 0 0 4px; font-weight: 600; }}
-.video video {{ width: 100%; display: block; box-sizing: border-box; border: 6px solid rgb(46,184,114); border-radius: 6px; background: #000; }}
-.scene {{ position: relative; background: #fff; border: 1px solid #e3e3e3; border-radius: 6px; overflow: hidden; }}
+.video video {{ width: 100%; aspect-ratio: 1; object-fit: cover; display: block; box-sizing: border-box; border: 6px solid rgb(46,184,114); border-radius: 6px; background: #000; }}
+.scene {{ position: relative; aspect-ratio: var(--aspect); box-sizing: border-box; background: #fff; border: 1px solid #e3e3e3; border-radius: 6px; overflow: hidden; }}
 .scene iframe {{ position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }}
 .scene .hint {{ position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #889; font-size: 13px; pointer-events: none; }}
 .ramp {{ display: inline-block; width: 110px; height: 10px; border-radius: 2px; vertical-align: -1px; background: linear-gradient(90deg, rgb(46,184,114), rgb(52,136,219), rgb(142,68,173)); }}
-footer {{ color: #666; font-size: 12.5px; padding: 0 22px 30px; }}
-@media (max-width: 900px) {{ .pane .body {{ grid-template-columns: 1fr; }} }}
+footer {{ color: #666; font-size: 12.5px; max-width: 1400px; margin: 0 auto; padding: 0 24px 30px; box-sizing: border-box; }}
+@media (max-width: 900px) {{ .pane .body {{ flex-direction: column; }} .pane .video, .pane .motion {{ flex: none; width: 100%; }} }}
 </style></head><body>
 {sitenav("figures")}
-<header>
+<header><div class="wrap">
 <h1>Aligning Egocentric Video and Human Motion Generation</h1>
 <p class="byline">Anthony Zhang &middot; M.S. thesis, Electrical Engineering and Computer Sciences, UC Berkeley, 2026</p>
 <div class="notes">
@@ -366,8 +374,8 @@ scene moves its video with it.</p>
 VGGT-&Omega;'s cameras; <a href="{SAMPLES_URL}#results">Results</a> has the thesis's quantitative comparison of the training
 phases.</p>
 </div>
-</header>
-<main>
+</div></header>
+<main class="wrap">
 {"".join(cards)}
 </main>
 {FOOTER}
