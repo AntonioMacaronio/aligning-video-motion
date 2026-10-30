@@ -3,84 +3,72 @@
   "name": "joint_1",
   "mode": "joint",
   "title": "Climbing a staircase",
-  "tag": "best of 17 samples",
   "caption": "First Person POV: Walk up the stairs."
  },
  {
   "name": "joint_2",
   "mode": "joint",
   "title": "Walking backwards on a road and kicking a ball",
-  "tag": "",
   "caption": "First Person POV: Walk backwards on the road. Subtly turn right. Walk forward and kick the ball with your right foot. Walk backwards."
  },
  {
   "name": "joint_3",
   "mode": "joint",
   "title": "Walking to a refrigerator and opening both doors",
-  "tag": "",
   "caption": "First Person POV: Walk toward the kitchen. Stand in front of the refrigerator. Open the refrigerator with your right hand. Open the left refrigerator door with your left hand."
  },
  {
   "name": "joint_4",
   "mode": "joint",
   "title": "Walking into an office while looking around, then turning right to the shelves",
-  "tag": "best of 9 samples",
   "caption": "First Person POV: Walk towards the office area while looking around. Turn to the right. Look at the shelves."
  },
  {
   "name": "motion_cond_1",
   "mode": "motion_cond",
   "title": "Walking across a patio and turning",
-  "tag": "",
   "caption": "First Person POV: Walk on the patio. Turn left. Walk forward. Turn right. Sit on the chair."
  },
  {
   "name": "motion_cond_2",
   "mode": "motion_cond",
   "title": "Walking from one living area into another",
-  "tag": "",
   "caption": "First Person POV: Walk towards another living area with your left arm bent to the front at chest level. Put your left hand at stomach level."
  },
  {
   "name": "motion_cond_3",
   "mode": "motion_cond",
   "title": "Carrying a laptop through a living room",
-  "tag": "",
   "caption": "First Person POV: Walk in the living room while carrying the laptop with both hands. Turn to the left. Stop walking. Move aside an object on the side table with your right hand. Hold the laptop with both hands."
  },
  {
   "name": "motion_cond_4",
   "mode": "motion_cond",
   "title": "Walking around a bed and picking up a scarf",
-  "tag": "",
   "caption": "First Person POV: Walk counterclockwise in the bedroom. Bend your body. Pick up the scarf on the bed with both hands."
  },
  {
   "name": "video_cond_1",
   "mode": "video_cond",
   "title": "Walking down a long hallway and turning left",
-  "tag": "",
   "caption": "First Person POV: Walk in a hallway. Turn to the left while swaying both hands on your sides."
  },
  {
   "name": "video_cond_2",
   "mode": "video_cond",
   "title": "Walking past the stairs into a bedroom",
-  "tag": "",
   "caption": "First Person POV: Walk in the hallway near the stairs."
  },
  {
   "name": "video_cond_3",
   "mode": "video_cond",
   "title": "Carrying a tray through a cafeteria",
-  "tag": "",
   "caption": "First Person POV: Walk along the cafeteria while holding the tray with both hands."
  },
  {
   "name": "video_cond_4",
   "mode": "video_cond",
   "title": "Turning and walking past a pool table in a garage",
-  "tag": "",
   "caption": "First Person POV: Turn left. Walk forward in the garage."
  }
 ]

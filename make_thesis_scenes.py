@@ -1,7 +1,7 @@
 """Animated scenes of the thesis's Section 4.4 gallery for the site's main page.
 
     PYTHONPATH=<LVP tree with datasets/head_correction.py> python make_thesis_scenes.py \
-        <gallery dir> <figure-src gallery dir> <site dir> [--videos-only] [name ...]
+        <gallery dir> <figure-src gallery dir> <site dir> [--tasks <tasks dir>] [--videos-only] [name ...]
 
 <gallery dir> holds gallery_scene.py's scenes/<name>/{scene.npz,frames/} and the examples' inputs
 (<cohort>/motion/<clip>.pt); <figure-src gallery dir> is the thesis repo's figure-src/gallery-44-20261025
@@ -16,6 +16,11 @@ color ramp and occluder cut. For each of the twelve examples:
   because the page seeks it to the scene's playback time on every frame (video frame k = motion frame 3k).
 Writes <site>/recordings/thesis/<name>.viser and .json (the figure camera) and <site>/media/thesis/<name>.mp4;
 --videos-only rewrites just the videos.
+
+--tasks adds each example's other two tasks (the page's tabs): <tasks dir>/examples_tasks.json lists them as
+<example>__<task> with the evaluation's samples of the same clip, and <tasks dir> holds their scenes (built by
+gallery_scene.py, or gallery_scene_local.py on a laptop) and inputs. Each uses its example's figure camera and
+views.json options, so the three tasks of a clip open at the same view.
 """
 import argparse
 import json
@@ -30,8 +35,14 @@ import viser.transforms as vtf
 from scipy.spatial import cKDTree
 
 GALLERY, FIGSRC, SITE = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
-VIDEOS_ONLY = "--videos-only" in sys.argv[4:]
-NAMES = [name for name in sys.argv[4:] if name != "--videos-only"]
+_rest = sys.argv[4:]
+TASKS = None
+if "--tasks" in _rest:
+    _i = _rest.index("--tasks")
+    TASKS = Path(_rest[_i + 1])
+    _rest = _rest[:_i] + _rest[_i + 2:]
+VIDEOS_ONLY = "--videos-only" in _rest
+NAMES = [name for name in _rest if name != "--videos-only"]
 sys.path.insert(0, str(FIGSRC.parent / "data-figure-20261023"))
 from render_datafig import occluders, ramp  # noqa: E402  the figure's own color ramp and occluder cut
 
@@ -156,20 +167,24 @@ def main():
     skinner, identities = MhrMeshSkinner(), SubjectIdentities.load(SUBJECT_IDENTITY_PATH)
     (SITE / "recordings" / "thesis").mkdir(parents=True, exist_ok=True)
     (SITE / "media" / "thesis").mkdir(parents=True, exist_ok=True)
+    # (name, the example whose figure camera and views it uses, its scene directory's root, its entry)
+    jobs = [(e["name"], e["name"], GALLERY, e) for e in examples]
+    if TASKS is not None:
+        jobs += [(e["name"], e["example"], TASKS, e) for e in json.loads((TASKS / "examples_tasks.json").read_text())]
     port = 9400
-    for example in examples:
-        name, clip = example["name"], example["clip"]
+    for name, base, root, example in jobs:
+        clip = example["clip"]
         if NAMES and name not in NAMES:
             continue
-        scene_dir = GALLERY / "scenes" / name
+        scene_dir = root / "scenes" / name
         video = SITE / "media" / "thesis" / f"{name}.mp4"
         if VIDEOS_ONLY:
             encode_video(scene_dir, video)
             print(name, f"video {video.stat().st_size / 1e6:.2f} MB", flush=True)
             continue
         scene = dict(np.load(scene_dir / "scene.npz"))
-        camera = FIGSRC / "cameras" / f"{name}.json"
-        extras = views.get(name, views["default"])
+        camera = FIGSRC / "cameras" / f"{base}.json"
+        extras = views.get(base, views["default"])
         height = round(2400 / (json.loads(camera.read_text()).get("aspect") or 2.4))
         argv = ["--width", "2400", "--height", str(height), *COMMON,
                 *([] if "--pick" in extras else ["--every", "2"]), *extras, "--camera-json", str(camera), "--cut-from-view"]
@@ -181,7 +196,7 @@ def main():
             points, colors = points[np.sort(pick)], colors[np.sort(pick)]
 
         # The body at every frame, as gallery_scene.py posed its snapshots.
-        motion = torch.load(GALLERY / example["cohort"] / "motion" / f"{clip}.pt", map_location="cpu",
+        motion = torch.load(root / example["cohort"] / "motion" / f"{clip}.pt", map_location="cpu",
                             weights_only=False)[example["motion"]].double().numpy()
         motion = correct_head_rotation(motion, head_to_cpf_offset(clip))
         joints, _, _ = motion_v2_to_joints(motion)
