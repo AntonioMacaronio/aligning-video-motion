@@ -367,9 +367,10 @@ showExample(linked ? linked.id : stageCards[0].id);
 if (linked) document.getElementById("examples").scrollIntoView();"""
 
 MAIN = (site / "post_template.html").read_text()
-# The viewer leads with the laptop clip on its joint-generation tab (the user's pick); the rest follow in thesis order.
-LEAD, LEAD_TASK = "motion_cond_3", "joint"
-order = sorted(examples, key=lambda e: e["name"] != LEAD)
+# The viewer's examples in thesis order (Figures 4.1 to 4.6); it opens on the first. To lead with another example, name
+# it here and the task its tab opens on, e.g. LEAD, LEAD_TASK = "motion_cond_3", "joint".
+LEAD, LEAD_TASK = None, None
+order = sorted(examples, key=lambda e: e["name"] != LEAD) if LEAD else examples
 strip = "".join(
     f'<button type="button" class="thumb" data-example="{e["name"]}" aria-pressed="{"true" if i == 0 else "false"}" '
     f'title="{html.escape(e["title"])}"><img src="figures/thumbs/{e["name"]}.jpg" width="176" height="176" '
