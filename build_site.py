@@ -257,15 +257,16 @@ def pane(e, task, active):
             f'title="{html.escape(e["title"])}: {t["label"].lower()}"></iframe></div></div></div></div>')
 
 
-def card(e):
-    """One example: its title and caption, a tab per task (selected: its figure's task) and a pane per task."""
-    mode = e["mode"]
+def card(e, shown, opens=None):
+    """One example: its title and caption, a tab per task and a pane per task, open on `opens` (default: its figure's
+    task, which its tab marks)."""
+    mode, opens = e["mode"], opens or e["mode"]
     tabs = "".join(
-        f'<button role="tab" data-task="{task}" aria-selected="{"true" if task == mode else "false"}">{t["label"]}'
+        f'<button role="tab" data-task="{task}" aria-selected="{"true" if task == opens else "false"}">{t["label"]}'
         f'{" <span class=fig-mark>thesis figure</span>" if task == mode else ""}</button>' for task, t in TASKS.items())
-    return (f'<div class="example" id="{e["name"]}"><h4>{html.escape(e["title"])}</h4>'
+    return (f'<div class="example" id="{e["name"]}"{"" if shown else " hidden"}><h4>{html.escape(e["title"])}</h4>'
             f'<p class="caption">{html.escape(e["caption"])}</p><div class="tabs" role="tablist">{tabs}</div>'
-            + "".join(pane(e, task, task == mode) for task in TASKS) + "</div>")
+            + "".join(pane(e, task, task == opens) for task in TASKS) + "</div>")
 
 
 PAGE_JS = """const RAMP = [[46, 184, 114], [52, 136, 219], [142, 68, 173]];
@@ -346,18 +347,40 @@ const tocObserver = new IntersectionObserver((entries) => {
   entries.forEach((e) => (e.isIntersecting ? besideToc.add(e.target) : besideToc.delete(e.target)));
   toc.classList.toggle("dim", besideToc.size > 0);
 }, { rootMargin: "-90px 0px -35% 0px" });
-document.querySelectorAll("main .wide").forEach((el) => tocObserver.observe(el));"""
+document.querySelectorAll("main .wide").forEach((el) => tocObserver.observe(el));
+// The thesis figures viewer: one example on the stage at a time, picked from the strip; #<example> opens one.
+const stageCards = [...document.querySelectorAll(".stage .example")], thumbs = [...document.querySelectorAll(".thumb")];
+function showExample(name) {
+  const card = stageCards.find((c) => c.id === name) || stageCards[0];
+  for (const c of stageCards) {
+    if (c !== card) for (const p of panes) if (c.contains(p.pane)) setOn(p, false);
+    c.hidden = c !== card;
+  }
+  thumbs.forEach((t) => t.setAttribute("aria-pressed", String(t.dataset.example === card.id)));
+}
+thumbs.forEach((t) => t.addEventListener("click", () => {
+  showExample(t.dataset.example);
+  history.replaceState(null, "", "#" + t.dataset.example);
+}));
+const linked = stageCards.find((c) => "#" + c.id === location.hash);
+showExample(linked ? linked.id : stageCards[0].id);
+if (linked) document.getElementById("examples").scrollIntoView();"""
 
-HERO = "joint_1"  # the staircase (Figure 4.1's first example) opens the page; the other eleven are in "Thesis figures"
 MAIN = (site / "post_template.html").read_text()
-slots = {"<!--HERO-->": card(next(e for e in examples if e["name"] == HERO)), "<!--FOOTER-->": FOOTER,
-         "<!--SCRIPT-->": SYNC_JS + PAGE_JS}
-for mode, _ in SECTIONS:
-    slots[f"<!--EXAMPLES:{mode}-->"] = "\n".join(card(e) for e in examples if e["mode"] == mode and e["name"] != HERO)
+# The viewer leads with the laptop clip on its joint-generation tab (the user's pick); the rest follow in thesis order.
+LEAD, LEAD_TASK = "motion_cond_3", "joint"
+order = sorted(examples, key=lambda e: e["name"] != LEAD)
+strip = "".join(
+    f'<button type="button" class="thumb" data-example="{e["name"]}" aria-pressed="{"true" if i == 0 else "false"}" '
+    f'title="{html.escape(e["title"])}"><img src="figures/thumbs/{e["name"]}.jpg" width="176" height="176" '
+    f'alt="{html.escape(e["title"])}"></button>' for i, e in enumerate(order))
+slots = {"<!--STAGE-->": "\n".join(card(e, i == 0, LEAD_TASK if i == 0 else None) for i, e in enumerate(order)),
+         "<!--THUMBS-->": strip,
+         "<!--FOOTER-->": FOOTER, "<!--SCRIPT-->": SYNC_JS + PAGE_JS}
 for slot, value in slots.items():
     assert MAIN.count(slot) == 1, slot
     MAIN = MAIN.replace(slot, value)
-assert MAIN.count("<!--GALLERY_URL-->") == 2
+assert MAIN.count("<!--GALLERY_URL-->") == 1, MAIN.count("<!--GALLERY_URL-->")
 MAIN = MAIN.replace("<!--GALLERY_URL-->", SAMPLES_REL)
 assert not re.search(r"<!--[A-Z_:a-z]+-->", MAIN), "unfilled slot"
 (site / "index.html").write_text(MAIN)
