@@ -1,17 +1,18 @@
-"""Build the thesis's two results sites from the K v2b 12.5k gallery (GitHub Pages, branch gh-pages of each repo).
+"""Build the thesis's results site from the K v2b 12.5k gallery (GitHub Pages, branch gh-pages of two repos).
 
     python3 build_site.py <gallery dir> <site repo dir> <samples repo dir>
 
-The thesis figures site (<site repo>, https://antoniomacaronio.github.io/aligning-video-motion/):
-- index.html: the thesis's Section 4.4 examples. Each opens on its figure's task and has tabs for the same clip's
-  other two tasks (make_thesis_scenes.py writes recordings/thesis/ and media/thesis/; thesis_examples.json has the
-  titles and captions);
-- gallery.html: a redirect to the samples site, so old links (including #results) keep working.
-The samples site (<samples repo>, https://antoniomacaronio.github.io/aligning-video-motion-samples/): index.html, the
+The project page (<site repo>, https://antoniomacaronio.github.io/aligning-video-motion/): index.html, a blog-style
+write-up of the thesis rendered from post_template.html (its prose, the thesis figures that make_post_figures.py renders
+into figures/, and the Chapter 4 tables), with the thesis's twelve Section 4.4 examples as interactive scenes. Each
+example opens on its figure's task and has tabs for the same clip's other two tasks (make_thesis_scenes.py writes
+recordings/thesis/ and media/thesis/; thesis_examples.json has the titles and captions). gallery.html redirects old
+links to the gallery, and #results to the page's Results section.
+The gallery (<samples repo>, https://antoniomacaronio.github.io/aligning-video-motion-samples/): index.html, the
 gallery's 64 clips rewritten for an outside reader (a header in the thesis's terms, without internal paths, commit
-hashes or run codenames; tab labels; a Results tab with the thesis's Chapter 4 tables), its viser recordings, and its
-videos re-encoded once (H.264 CRF 26, every frame a keyframe; media/.encoded.json). The two are separate repos
-because GitHub Pages caps each site at 1 GB.
+hashes or run codenames; tab labels; a link back to the project page), its viser recordings, and its videos re-encoded
+once (H.264 CRF 26, every frame a keyframe; media/.encoded.json). The two are separate repos because GitHub Pages caps
+each site at 1 GB.
 
 On both pages a 3D scene loads, and the videos beside it play, only while the example (or gallery row) is fully on
 screen, or fills the screen when it is taller than it; the videos then follow the scene's playback clock (the viewer's
@@ -66,20 +67,12 @@ manifest_path.write_text(json.dumps({k: manifest[k] for k in sorted(manifest) if
 
 FIGURES_URL, SAMPLES_URL = "https://antoniomacaronio.github.io/aligning-video-motion/", \
     "https://antoniomacaronio.github.io/aligning-video-motion-samples/"
-SITENAV_CSS = (".sitenav { background: #fff; border-bottom: 1px solid #ddd; padding: 0 22px; display: flex; gap: 2px; }\n"
-               ".sitenav a { font-size: 14px; padding: 9px 14px; color: #3182bd; text-decoration: none; }\n"
-               ".sitenav a.active { color: #222; font-weight: 600; }\n")
-
-
-def sitenav(active):
-    """Links between the two sites; on the samples site, #results opens its Results tab."""
-    here = {"figures": ("index.html", "../aligning-video-motion-samples/"),
-            "gallery": ("../aligning-video-motion/", "index.html")}[active]
-    links = ((here[0], "Thesis figures", "figures"), (here[1], "More samples", "gallery"),
-             (here[1] + "#results", "Results", "results"))
-    marked = ' class="active"'
-    return '<div class="sitenav">' + "".join(
-        f'<a href="{href}"{marked if key == active else ""}>{label}</a>' for href, label, key in links) + "</div>"
+# Relative links between the two sites, so that both also work side by side under one local server.
+FIGURES_REL, SAMPLES_REL = "../aligning-video-motion/", "../aligning-video-motion-samples/"
+BACKBAR = (f'<div class="backbar"><a href="{FIGURES_REL}">&larr; Aligning Egocentric Video and Human Motion Generation'
+           '</a></div>')
+BACKBAR_CSS = (".backbar { background: #fff; border-bottom: 1px solid #ddd; padding: 9px 22px; font-size: 14px; }\n"
+               ".backbar a { color: #3182bd; text-decoration: none; }\n")
 
 
 # Shared page script: the viewer's playback time, and "fully on screen" for an element.
@@ -111,9 +104,10 @@ const THRESHOLDS = Array.from({ length: 41 }, (_, i) => i / 40);
 # ---------------------------------------------------------------- the samples site: the gallery page
 s = (src / "index.html").read_text()
 
-HEADER = """<header>
-<h1>Aligning Egocentric Video and Human Motion Generation</h1>
-<p class="byline">Anthony Zhang &middot; M.S. thesis, Electrical Engineering and Computer Sciences, UC Berkeley, 2026</p>
+HEADER = f"""<header>
+<h1>Gallery</h1>
+<p class="byline">Samples for <a href="{FIGURES_REL}">Aligning Egocentric Video and Human Motion Generation</a> &middot;
+Anthony Zhang &middot; M.S. thesis, Electrical Engineering and Computer Sciences, UC Berkeley, 2026</p>
 <div class="notes">
 <p>Samples from the final model, a HunyuanVideo&nbsp;1.5 video diffusion transformer extended with a motion stream and trained
 with joint finetuning, a text curriculum and geometric post-training. Each row is one clip, sampled once per task with the
@@ -130,20 +124,24 @@ The camera frustums are estimated by VGGT-&Omega; from each video and anchored a
 Drag to orbit; the toggles below apply to every scene. A row's scene loads, and its videos play, when the row is fully on
 screen, and the videos follow the scene's play bar, so pausing or scrubbing the scene moves all five.</p>
 <p><b>Training-split clips</b>: 16 clips from the training split. <b>Held-out clips</b>: 48 clips from validation participants
-who never appear in training. <b>Results</b>: the thesis's quantitative comparison of the training phases.</p>
+who never appear in training. The method and the quantitative results are on the
+<a href="{FIGURES_REL}">project page</a>.</p>
 </div>
 </header>"""
 
 a = s.index("<header>")
 b = s.index("</header>") + len("</header>")
 s = s[:a] + HEADER + s[b:]
-s = re.sub(r"<title>.*?</title>", "<title>Aligning Egocentric Video and Human Motion Generation: more samples</title>",
+s = re.sub(r"<title>.*?</title>", "<title>Aligning Egocentric Video and Human Motion Generation: gallery</title>",
            s, count=1, flags=re.S)
 
 for old, new in (('<button data-tab="training">Training (16/16)</button>', '<button data-tab="training">Training-split clips (16)</button>'),
                  ('<button data-tab="validation">Validation (48/48)</button>', '<button data-tab="validation">Held-out clips (48)</button>')):
     assert s.count(old) == 1, old
     s = s.replace(old, new)
+old = '<button data-tab="results">Results</button>'
+assert s.count(old) == 1
+s = s.replace(old, "")  # the results are on the project page
 s = s.replace(" &middot; diagnostic clip</h3>", " &middot; training-split clip</h3>")
 s = s.replace("<figcaption>GT video</figcaption>", "<figcaption>recorded video</figcaption>")
 s = s.replace('<i class="chip" style="background:#c8c8c8"></i>GT</label>', '<i class="chip" style="background:#c8c8c8"></i>recorded</label>')
@@ -154,62 +152,11 @@ s = s.replace(old, "")  # the scene's play bar drives all five videos
 s = s.replace('<div class="hint">3D scene loads when scrolled into view</div>',
               '<div class="hint">the 3D scene loads when the row is fully on screen</div>')
 
-ROWS = [("", ""), ("&#10003;", ""), ("", "&#10003;"), ("&#10003;", "&#10003;")]
-
-
-def table(title, note, columns, rows, groups=None):
-    head = ""
-    if groups:
-        head += "<tr><th></th><th></th>" + "".join(f'<th colspan="{n}">{g}</th>' for g, n in groups) + "</tr>"
-    head += "<tr><th>Curriculum</th><th>Geometry</th>" + "".join(f"<th>{c}</th>" for c in columns) + "</tr>"
-    body = ""
-    for (c, g), values in zip(ROWS, rows):
-        body += f"<tr><td>{c}</td><td>{g}</td>" + "".join(f"<td>{v}</td>" for v in values) + "</tr>"
-    return f'<div class="chart"><h3>{title}</h3><p>{note}</p><table class="results">{head}{body}</table></div>'
-
-
-RESULTS = '<section class="tab" id="tab-results"><div class="notes" style="margin-bottom:12px">' + (
-    "Four models, each trained for 12,500 updates: joint finetuning alone, with the curriculum, with geometric "
-    "post-training, and with both (the final model). A model that leaves out a phase trains on the joint-finetuning "
-    "loss for those updates instead. All four are evaluated on the same 64 clips from validation participants, one "
-    "sample per clip and task with the clip's fixed seed; intervals are 95% clip-bootstrap intervals. Bold marks the "
-    "best value in each column.</div>") + '<div class="charts">' + "".join([
-    table("Rotation error (&deg;)",
-          "Relative to the first frame (lower is better): the joint video's camera against the joint head "
-          "(self-consistency); the generated head against the recorded head given the real video; the generated "
-          "video's camera against the recorded head given the real motion. VGGT-&Omega;'s camera from the "
-          "recorded video lies 3.8&deg; from the recorded head, the lowest error the camera-based columns can reach.",
-          ["Self-consistency", "Video-conditioned", "Motion-conditioned"],
-          [["21.5", "29.7", "15.8"], ["19.5", "31.4", "14.8"], ["18.6", "<b>27.6</b>", "<b>14.1</b>"],
-           ["<b>16.7</b>", "29.6", "<b>14.1</b>"]]),
-    table("Fr&eacute;chet distances",
-          "Lower is better. Video FID on Inception-v3 features of the generated frames after the first, against the "
-          "same clips' recordings through the VAE. Motion FD directly on the standardized motion features (pose) and "
-          "their frame-to-frame differences (velocity), against the recorded motion; it uses no learned motion "
-          "encoder, unlike an M-FID.",
-          ["Joint", "Motion-cond.", "Joint", "Video-cond.", "Joint", "Video-cond."],
-          [["71.7", "65.8", "42.6", "30.9", "0.60", "0.62"], ["63.5", "59.5", "34.1", "32.1", "0.64", "0.60"],
-           ["<b>63.4</b>", "57.7", "<b>23.8</b>", "21.3", "0.42", "0.38"],
-           ["63.8", "<b>55.6</b>", "28.2", "<b>21.0</b>", "<b>0.37</b>", "<b>0.37</b>"]],
-          groups=[("Video FID", 2), ("Motion FD, pose", 2), ("Motion FD, velocity", 2)]),
-    table("HandScore",
-          "F-score, averaged over the two hands, between the wearer's hands Qwen3-VL-32B finds in each frame and the "
-          "hands the motion places in view of the headset's camera (higher is better). Recorded pairs score 0.83 "
-          "[0.77, 0.88]; pairing a video with another clip's motion scores about 0.43.",
-          ["Joint", "Motion-cond. video", "Video-cond. motion"],
-          [["0.65 [0.58, 0.71]", "0.72 [0.64, 0.78]", "0.72 [0.63, 0.79]"],
-           ["<b>0.73 [0.64, 0.80]</b>", "<b>0.76 [0.67, 0.84]</b>", "0.73 [0.65, 0.80]"],
-           ["0.69 [0.60, 0.77]", "<b>0.76 [0.67, 0.82]</b>", "0.72 [0.64, 0.80]"],
-           ["0.69 [0.60, 0.76]", "0.69 [0.59, 0.77]", "<b>0.74 [0.66, 0.81]</b>"]]),
-]) + "</div></section>"
-
 a = s.index('<section class="tab" id="tab-results">')
 b = s.index("</section>", a) + len("</section>")
-s = s[:a] + RESULTS + s[b:]
-s = s.replace("</style></head>", ".results { border-collapse: collapse; width: 100%; font-size: 13px; }\n"
-              ".results th, .results td { padding: 4px 8px; text-align: center; border-bottom: 1px solid #e5e5e5; }\n"
-              ".results th { font-weight: 600; color: #333; }\n.byline { color: #555; margin: 2px 0 10px; }\n"
-              "footer { color: #666; font-size: 12.5px; padding: 0 22px 30px; }\n" + SITENAV_CSS + "</style></head>", 1)
+s = s[:a] + s[b:]  # the gallery's own Results tab: the project page has the thesis's tables
+s = s.replace("</style></head>", ".byline { color: #555; margin: 2px 0 10px; }\n"
+              "footer { color: #666; font-size: 12.5px; padding: 0 22px 30px; }\n" + BACKBAR_CSS + "</style></head>", 1)
 for old, new in (('<input type="radio" name="layout" value="overlay" checked>', '<input type="radio" name="layout" value="overlay">'),
                  ('<input type="radio" name="layout" value="side">', '<input type="radio" name="layout" value="side" checked>')):
     assert s.count(old) == 1, old
@@ -217,7 +164,7 @@ for old, new in (('<input type="radio" name="layout" value="overlay" checked>', 
 FOOTER = ("<footer>Data: NymeriaPlus, built on the Nymeria dataset of Project Aria recordings (Meta Reality Labs "
           "Research). Video model: HunyuanVideo&nbsp;1.5. Camera estimates: VGGT-&Omega;. 3D viewer: viser.</footer>")
 s = s.replace("<script>", FOOTER + "\n<script>", 1)
-s = s.replace("<header>", sitenav("gallery") + "\n<header>", 1)
+s = s.replace("<header>", BACKBAR + "\n<header>", 1)
 
 # The gallery's loader loaded every scene near the viewport; now a row's scene loads, and its five videos play, only
 # while the row is fully on screen, and the videos follow the scene's playback clock.
@@ -262,20 +209,21 @@ requestAnimationFrame(tick);"""
 s = s[:a] + GALLERY_JS + s[b:]
 old = 'showTab(location.hash.slice(1) || "training");'
 assert s.count(old) == 1
-s = s.replace(old, old + '\naddEventListener("hashchange", () => showTab(location.hash.slice(1) || "training"));')
+s = s.replace(old, f'if (location.hash === "#results") location.replace("{FIGURES_URL}#results");\n' + old
+              + '\naddEventListener("hashchange", () => showTab(location.hash.slice(1) || "training"));')
 (samples / "index.html").write_text(s)
 (samples / "README.md").write_text(
-    "# More samples: Aligning Egocentric Video and Human Motion Generation\n\n"
-    f"The 64-clip gallery of the thesis's results site ({FIGURES_URL}), served at {SAMPLES_URL}.\n"
-    "Built by `build_site.py` in the thesis figures site's repo (AntonioMacaronio/aligning-video-motion); do not edit "
+    "# Gallery: Aligning Egocentric Video and Human Motion Generation\n\n"
+    f"The 64-clip gallery of the thesis's project page ({FIGURES_URL}), served at {SAMPLES_URL}.\n"
+    "Built by `build_site.py` in the project page's repo (AntonioMacaronio/aligning-video-motion); do not edit "
     "the files here by hand.\n")
 
-# ---------------------------------------------------------------- the thesis figures site
+# ---------------------------------------------------------------- the project page
 (site / "gallery.html").write_text(
-    '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>More samples</title>'
+    '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Gallery</title>'
     f'<meta http-equiv="refresh" content="0; url={SAMPLES_URL}">'
-    f'<script>location.replace("{SAMPLES_URL}" + location.hash);</script></head>'
-    f'<body><p>The samples moved to <a href="{SAMPLES_URL}">{SAMPLES_URL}</a>.</p></body></html>\n')
+    f'<script>location.replace(location.hash === "#results" ? "{FIGURES_URL}#results" : "{SAMPLES_URL}" + location.hash);'
+    f'</script></head><body><p>The gallery moved to <a href="{SAMPLES_URL}">{SAMPLES_URL}</a>.</p></body></html>\n')
 
 TASKS = {
     "joint": dict(label="Joint generation", note="The video and the motion are both generated from the caption and the "
@@ -309,147 +257,113 @@ def pane(e, task, active):
             f'title="{html.escape(e["title"])}: {t["label"].lower()}"></iframe></div></div></div></div>')
 
 
-cards = []
-for mode, figures in SECTIONS:
-    cards.append(f'<h2>{TASKS[mode]["label"]} <span class="figref">thesis {figures}</span></h2>')
-    for e in (e for e in examples if e["mode"] == mode):
-        tabs = "".join(
-            f'<button role="tab" data-task="{task}" aria-selected="{"true" if task == mode else "false"}">{t["label"]}'
-            f'{" <span class=fig-mark>thesis figure</span>" if task == mode else ""}</button>' for task, t in TASKS.items())
-        cards.append(f'<div class="example"><h3>{html.escape(e["title"])}</h3>'
-                     f'<p class="caption">{html.escape(e["caption"])}</p><div class="tabs" role="tablist">{tabs}</div>'
-                     + "".join(pane(e, task, task == mode) for task in TASKS) + "</div>")
-MAIN = f"""<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Aligning Egocentric Video and Human Motion Generation</title>
-<meta name="viewport" content="width=device-width, initial-scale=1"><style>
-body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; margin: 0; color: #222; background: #f6f7f9; }}
-/* One centred column: the nav links, the header, the examples and the footer share its left and right edges. */
-.wrap {{ max-width: 1400px; margin: 0 auto; padding-left: 24px; padding-right: 24px; box-sizing: border-box; }}
-header {{ padding: 18px 0 8px; background: #fff; border-bottom: 1px solid #ddd; }}
-h1 {{ font-size: 20px; margin: 0 0 6px; }}
-.byline {{ color: #555; margin: 2px 0 10px; }}
-.notes {{ font-size: 13px; line-height: 1.5; color: #444; }}
-{SITENAV_CSS}.sitenav {{ position: sticky; top: 0; z-index: 10; padding: 0 calc(max(0px, (100% - 1400px) / 2) + 10px); }}
-main {{ padding-top: 4px; padding-bottom: 30px; }}
-h2 {{ font-size: 17px; margin: 22px 0 8px; }}
-.figref {{ font-size: 12.5px; color: #777; font-weight: 400; margin-left: 6px; }}
-.example {{ background: #fff; border: 1px solid #ddd; border-radius: 8px; margin: 0 0 16px; padding: 14px 16px; }}
-.example h3 {{ font-size: 14.5px; margin: 0 0 2px; }}
-.example .caption {{ font-size: 12.5px; color: #555; margin: 0 0 6px; }}
-.tabs {{ display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid #e3e3e3; margin: 0 0 8px; }}
-.tabs button {{ font: inherit; font-size: 13px; padding: 6px 12px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: #3182bd; cursor: pointer; }}
-.tabs button[aria-selected="true"] {{ color: #222; font-weight: 600; border-bottom-color: #3182bd; }}
-.fig-mark {{ font-size: 11px; color: #666; background: #eef0f3; border-radius: 3px; padding: 0 5px; margin-left: 4px; font-weight: 400; }}
-.task-note {{ font-size: 12.5px; color: #555; margin: 0 0 8px; }}
-/* The square video and the scene (aspect --aspect) split the width in proportion, so they come out the same height. */
-.pane .body {{ display: flex; gap: 14px; align-items: flex-start; }}
-.pane .video {{ flex: 1 1 0; min-width: 0; }}
-.pane .motion {{ flex: var(--aspect) 1 0; min-width: 0; }}
-.panel-label {{ font-size: 12px; color: #444; margin: 0 0 4px; font-weight: 600; }}
-.video video {{ width: 100%; aspect-ratio: 1; object-fit: cover; display: block; box-sizing: border-box; border: 6px solid rgb(46,184,114); border-radius: 6px; background: #000; }}
-.scene {{ position: relative; aspect-ratio: var(--aspect); box-sizing: border-box; background: #fff; border: 1px solid #e3e3e3; border-radius: 6px; overflow: hidden; }}
-.scene iframe {{ position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }}
-.scene .hint {{ position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #889; font-size: 13px; pointer-events: none; }}
-.ramp {{ display: inline-block; width: 110px; height: 10px; border-radius: 2px; vertical-align: -1px; background: linear-gradient(90deg, rgb(46,184,114), rgb(52,136,219), rgb(142,68,173)); }}
-footer {{ color: #666; font-size: 12.5px; max-width: 1400px; margin: 0 auto; padding: 0 24px 30px; box-sizing: border-box; }}
-@media (max-width: 900px) {{ .pane .body {{ flex-direction: column; }} .pane .video, .pane .motion {{ flex: none; width: 100%; }} }}
-</style></head><body>
-{sitenav("figures")}
-<header><div class="wrap">
-<h1>Aligning Egocentric Video and Human Motion Generation</h1>
-<p class="byline">Anthony Zhang &middot; M.S. thesis, Electrical Engineering and Computer Sciences, UC Berkeley, 2026</p>
-<div class="notes">
-<p>One model generates egocentric video and the wearer's full-body motion together, or either one given the other. It extends
-the HunyuanVideo&nbsp;1.5 video diffusion transformer with a motion stream and is trained with joint finetuning, a text curriculum
-and geometric post-training. These are the examples of the thesis's Section 4.4, sampled from the final model. Each example
-opens on the task of its thesis figure; its tabs show the evaluation's samples of the same clip for the other two tasks.</p>
-<p>Each example shows the video on the left and the motion on the right: an MHR body with the subject's body shape, animated
-over the clip inside a VGGT-&Omega; point cloud of the video. As in the thesis figures, the body's color moves from green through
-blue to purple over the clip <span class="ramp"></span>, and the video's border follows the same colors. The point cloud is placed
-with the motion's own camera trajectory, so the body and the scene agree only as far as the video and the motion do, and the
-body's head follows the orientation of the Aria glasses. Each scene opens at its figure's camera; drag to orbit. A scene loads,
-and its video plays, when the example is fully on screen; the video follows the scene's play bar, so pausing or scrubbing a
-scene moves its video with it.</p>
-<p><a href="{SAMPLES_URL}">More samples</a> has the evaluation's 64 clips with every task, the recorded motion and
-VGGT-&Omega;'s cameras; <a href="{SAMPLES_URL}#results">Results</a> has the thesis's quantitative comparison of the training
-phases.</p>
-</div>
-</div></header>
-<main class="wrap">
-{"".join(cards)}
-</main>
-{FOOTER}
-<script>
-{SYNC_JS}const RAMP = [[46, 184, 114], [52, 136, 219], [142, 68, 173]];
-function ramp(f) {{
+def card(e):
+    """One example: its title and caption, a tab per task (selected: its figure's task) and a pane per task."""
+    mode = e["mode"]
+    tabs = "".join(
+        f'<button role="tab" data-task="{task}" aria-selected="{"true" if task == mode else "false"}">{t["label"]}'
+        f'{" <span class=fig-mark>thesis figure</span>" if task == mode else ""}</button>' for task, t in TASKS.items())
+    return (f'<div class="example" id="{e["name"]}"><h4>{html.escape(e["title"])}</h4>'
+            f'<p class="caption">{html.escape(e["caption"])}</p><div class="tabs" role="tablist">{tabs}</div>'
+            + "".join(pane(e, task, task == mode) for task in TASKS) + "</div>")
+
+
+PAGE_JS = """const RAMP = [[46, 184, 114], [52, 136, 219], [142, 68, 173]];
+function ramp(f) {
   const x = Math.min(Math.max(f, 0), 1) * (RAMP.length - 1), i = Math.min(Math.floor(x), RAMP.length - 2), t = x - i;
   return "rgb(" + RAMP[i].map((c, k) => Math.round(c + t * (RAMP[i + 1][k] - c))).join(",") + ")";
-}}
+}
 const MAX_LIVE = 3, live = [];
-function unload(frame) {{
+function unload(frame) {
   const i = live.indexOf(frame);
   if (i >= 0) live.splice(i, 1);
-  if (frame.dataset.loaded === "1") {{ frame.src = "about:blank"; frame.dataset.loaded = "0"; }}
+  if (frame.dataset.loaded === "1") { frame.src = "about:blank"; frame.dataset.loaded = "0"; }
   frame.previousElementSibling.style.display = "";
-}}
-function load(frame) {{
-  if (frame.dataset.loaded === "1") {{ live.splice(live.indexOf(frame), 1); live.push(frame); return; }}
+}
+function load(frame) {
+  if (frame.dataset.loaded === "1") { live.splice(live.indexOf(frame), 1); live.push(frame); return; }
   frame.src = frame.dataset.src; frame.dataset.loaded = "1"; frame.previousElementSibling.style.display = "none";
   live.push(frame);
   while (live.length > MAX_LIVE) unload(live[0]);
-}}
+}
 // One entry per task pane; only the selected pane of an example is displayed, so only it can become visible.
-const panes = [...document.querySelectorAll(".pane")].map((pane) => ({{
+const panes = [...document.querySelectorAll(".pane")].map((pane) => ({
   pane, body: pane.querySelector(".body"), video: pane.querySelector("video"), frame: pane.querySelector("iframe"),
   shown: -1, on: false,
-}}));
-function setOn(p, on) {{
+}));
+function setOn(p, on) {
   if (p.on === on) return;
   p.on = on;
   p.shown = -1;
-  if (on) {{ load(p.frame); startVideo(p.video); }}
-  else {{ unload(p.frame); p.video.pause(); }}
-}}
-const observer = new IntersectionObserver((entries) => entries.forEach((e) => {{
+  if (on) { load(p.frame); startVideo(p.video); }
+  else { unload(p.frame); p.video.pause(); }
+}
+const observer = new IntersectionObserver((entries) => entries.forEach((e) => {
   const p = panes.find((x) => x.body === e.target);
   if (p) setOn(p, !p.pane.hidden && fullyVisible(e));
-}}), {{ threshold: THRESHOLDS }});
+}), { threshold: THRESHOLDS });
 panes.forEach((p) => observer.observe(p.body));
-document.querySelectorAll(".example").forEach((example) => {{
-  example.querySelectorAll('.tabs [role="tab"]').forEach((tab) => tab.addEventListener("click", () => {{
+document.querySelectorAll(".example").forEach((example) => {
+  example.querySelectorAll('.tabs [role="tab"]').forEach((tab) => tab.addEventListener("click", () => {
     example.querySelectorAll('.tabs [role="tab"]').forEach((b) => b.setAttribute("aria-selected", String(b === tab)));
-    for (const p of panes) {{
+    for (const p of panes) {
       if (!example.contains(p.pane)) continue;
       const selected = p.pane.dataset.task === tab.dataset.task;
       if (!selected) setOn(p, false);
       p.pane.hidden = !selected;
-    }}
-  }}));
-}});
-function tick() {{
-  for (const p of panes) {{
+    }
+  }));
+});
+function tick() {
+  for (const p of panes) {
     if (!p.on) continue;
     const v = p.video, t = sceneTime(p.frame);
-    if (t !== null && v.readyState >= 1) {{
+    if (t !== null && v.readyState >= 1) {
       if (!v.paused) v.pause();
       const k = sceneFrame(t);
-      if (k !== p.shown) {{ v.currentTime = (k + 0.5) / VIDEO_FPS; p.shown = k; }}
+      if (k !== p.shown) { v.currentTime = (k + 0.5) / VIDEO_FPS; p.shown = k; }
       v.style.borderColor = ramp(k / LAST_FRAME);  // the body's color at motion frame 3k
-    }} else {{
+    } else {
       if (v.readyState === 0 && v.networkState !== HTMLMediaElement.NETWORK_LOADING) startVideo(v);
       if (v.duration) v.style.borderColor = ramp(v.currentTime / v.duration);  // the scene is loading: the video plays on its own
-    }}
-  }}
+    }
+  }
   requestAnimationFrame(tick);
-}}
+}
 requestAnimationFrame(tick);
-</script>
-</body></html>
-"""
+// Contents: mark the section being read, and fade the list while a wide figure or example passes beside it.
+const tocLinks = [...document.querySelectorAll(".toc a")];
+const tocTargets = tocLinks.map((a) => document.getElementById(a.hash.slice(1)));
+function markToc() {
+  let current = 0;
+  tocTargets.forEach((h, i) => { if (h.getBoundingClientRect().top < innerHeight * 0.35) current = i; });
+  tocLinks.forEach((a, i) => a.classList.toggle("current", i === current));
+}
+addEventListener("scroll", markToc, { passive: true });
+markToc();
+const toc = document.querySelector(".toc"), besideToc = new Set();
+const tocObserver = new IntersectionObserver((entries) => {
+  entries.forEach((e) => (e.isIntersecting ? besideToc.add(e.target) : besideToc.delete(e.target)));
+  toc.classList.toggle("dim", besideToc.size > 0);
+}, { rootMargin: "-90px 0px -35% 0px" });
+document.querySelectorAll("main .wide").forEach((el) => tocObserver.observe(el));"""
+
+HERO = "joint_1"  # the staircase (Figure 4.1's first example) opens the page; the other eleven are in "Thesis figures"
+MAIN = (site / "post_template.html").read_text()
+slots = {"<!--HERO-->": card(next(e for e in examples if e["name"] == HERO)), "<!--FOOTER-->": FOOTER,
+         "<!--SCRIPT-->": SYNC_JS + PAGE_JS}
+for mode, _ in SECTIONS:
+    slots[f"<!--EXAMPLES:{mode}-->"] = "\n".join(card(e) for e in examples if e["mode"] == mode and e["name"] != HERO)
+for slot, value in slots.items():
+    assert MAIN.count(slot) == 1, slot
+    MAIN = MAIN.replace(slot, value)
+assert MAIN.count("<!--GALLERY_URL-->") == 2
+MAIN = MAIN.replace("<!--GALLERY_URL-->", SAMPLES_REL)
+assert not re.search(r"<!--[A-Z_:a-z]+-->", MAIN), "unfilled slot"
 (site / "index.html").write_text(MAIN)
 
 for page, text in (("samples index.html", s), ("site index.html", MAIN)):
-    leftover = [p for p in (r"\bLVP\b", r"c1f6727|480f69b", r"\bB200\b", r"Run [A-Z]\b", r"\bv2b\b",
+    leftover = [p for p in (r"\bLVP\b", r"c1f6727|480f69b", r"Run [A-Z]\b", r"\bv2b\b",
                             r"A-cont|I-cc|I-cont", r"docs/", r"vis/", r"launch-records", r"s3://", r"grid ?2",
                             r"Hunyuan viewer")
                 if re.search(p, re.sub(r"<script.*?</script>", "", text, flags=re.S))]

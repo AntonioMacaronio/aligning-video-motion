@@ -1,18 +1,15 @@
-# Aligning Egocentric Video and Human Motion Generation: results site
+# Aligning Egocentric Video and Human Motion Generation: project page
 
-Static companion site for Anthony Zhang's M.S. thesis (UC Berkeley EECS, 2026). It shows the final model's samples on
-16 training-split and 48 held-out clips, with embedded, interactive viser scenes and the thesis's Chapter 4 tables.
+Static project page for Anthony Zhang's M.S. thesis (UC Berkeley EECS, 2026), served by GitHub Pages from this repo's
+`gh-pages` branch at https://antoniomacaronio.github.io/aligning-video-motion/. The gallery of all 64 evaluation clips is
+a separate repo, `aligning-video-motion-samples` (GitHub Pages allows 1 GB per site).
 
-- `index.html`: the page. `viser/`: the static viser client; each scene loads `recordings/<split>/<clip>.viser`
-  through `viser/index.html?playbackPath=...`. `media/`: the videos.
-- `build_site.py`: rebuilds this folder from the K v2b 12.5k gallery (`motion-v2-grid2-k2b12500-20261024`).
+- `post_template.html`: the page's source (prose, equations, tables). `build_site.py` fills its slots with the twelve
+  interactive thesis examples and the playback script, and writes `index.html`; edit the template, not `index.html`.
+- `figures/`: the thesis figures the page shows, rendered from the thesis's PDFs by `make_post_figures.py` (macOS).
+- `recordings/thesis/`, `media/thesis/`: the examples' viser recordings and videos, from `make_thesis_scenes.py`.
+- `viser/`: the static viser client; each scene loads `viser/index.html?playbackPath=../recordings/thesis/<name>.viser`.
+- `gallery.html`: a redirect for old links to the gallery.
 
-Preview locally: `python3 -m http.server 8765`, then open http://127.0.0.1:8765/.
-
-Not yet published. To publish on GitHub Pages once the data and publication approvals are confirmed:
-
-    gh repo create aligning-video-motion --public --source . --push
-    gh api -X POST repos/AntonioMacaronio/aligning-video-motion/pages -f 'source[branch]=main' -f 'source[path]=/'
-
-The site will then be at https://antoniomacaronio.github.io/aligning-video-motion/ (about 1 GB, within the Pages
-limit; no file is over 100 MB).
+Rebuild: `python3 build_site.py <gallery dir> <this repo> <samples repo>`. Preview: serve the parent folder of both repos
+with a server that supports HTTP Range requests (video seeking needs them), then open `/aligning-video-motion/`.
