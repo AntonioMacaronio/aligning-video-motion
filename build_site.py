@@ -112,7 +112,7 @@ Anthony Zhang &middot; M.S. thesis, Electrical Engineering and Computer Sciences
 <p>Samples from the final model, a HunyuanVideo&nbsp;1.5 video diffusion transformer extended with a motion stream and trained
 with joint finetuning, a text curriculum and geometric post-training. Each row is one clip, sampled once per task with the
 clip's fixed seed (50 Euler steps; text guidance 6 for the video and 2 for the motion).
-<b>Joint generation</b> produces the video and the motion from the first frame, the first pose and the caption;
+<b>Joint generation</b> produces the video and the motion from the first frame, the first pose and the text prompt;
 <b>video-conditioned motion</b> is given the recorded video and generates the motion;
 <b>motion-conditioned video</b> is given the recorded motion and generates the video.
 Below them, the joint and motion-conditioned videos are sampled again from the same seed with a <b>negative prompt</b>
@@ -226,11 +226,11 @@ s = s.replace(old, f'if (location.hash === "#results") location.replace("{FIGURE
     f'</script></head><body><p>The gallery moved to <a href="{SAMPLES_URL}">{SAMPLES_URL}</a>.</p></body></html>\n')
 
 TASKS = {
-    "joint": dict(label="Joint generation", note="The video and the motion are both generated from the caption and the "
+    "joint": dict(label="Joint generation", note="The video and the motion are both generated from the text prompt and the "
                   "first video frame.", video="Generated video", motion="Generated motion"),
-    "motion_cond": dict(label="Motion-conditioned video", note="The video is generated from the caption, the first frame "
+    "motion_cond": dict(label="Motion-conditioned video", note="The video is generated from the text prompt, the first frame "
                         "and the recorded motion shown.", video="Generated video", motion="Input motion (recorded)"),
-    "video_cond": dict(label="Video-conditioned motion", note="The motion is generated from the caption and the recorded "
+    "video_cond": dict(label="Video-conditioned motion", note="The motion is generated from the text prompt and the recorded "
                        "video shown.", video="Input video (recorded)", motion="Generated motion"),
 }
 SECTIONS = (("joint", "Figures 4.1 and 4.2"), ("motion_cond", "Figures 4.3 and 4.4"), ("video_cond", "Figures 4.5 and 4.6"))

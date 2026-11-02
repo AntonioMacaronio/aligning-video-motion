@@ -128,7 +128,7 @@ with a motion stream, and it is trained on about 180 hours of paired video and m
 <a href="https://arxiv.org/abs/2603.18496">NymeriaPlus</a>.</p>
 <p>A model trained only to denoise each modality learns their agreement implicitly, and it leaves a gap: the camera in its
 generated video and its generated head turn differently. We close part of that gap in two ways. A curriculum hides the
-caption and gives one modality clean, so that each stream has to read the other. Geometric post-training then scores the
+text prompt and gives one modality clean, so that each stream has to read the other. Geometric post-training then scores the
 model's own samples with VGGT-&Omega;, a 3D reconstruction model, by comparing the camera it recovers from the generated video
 with the generated head. Making that reward affordable for an 8B-parameter video model is the main engineering problem we
 solve. We copy the reward's gradient onto a single, randomly drawn denoising step, weighted so that the update is an
@@ -156,16 +156,16 @@ differentiating through dozens of denoising steps, the video decoder and the est
 both memory and time. Much of this post is about how we get a useful gradient without doing that.</p>
 
 <h2 id="model">One model, three tasks</h2>
-<p>Each training clip pairs 4.8 seconds of egocentric video with the wearer's full-body motion and a caption. The motion
+<p>Each training clip pairs 4.8 seconds of egocentric video with the wearer's full-body motion and a text prompt describing the wearer's actions. The motion
 keeps all 145 frames at 30&nbsp;fps, and the video keeps every third frame (49 frames at 10&nbsp;fps), so video frame
-\(k\) is motion frame \(3k\). Given the first frame, the first pose and the caption, one model handles three tasks: joint
+\(k\) is motion frame \(3k\). Given the first frame, the first pose and the text prompt, one model handles three tasks: joint
 generation of both, video-conditioned motion, and motion-conditioned video. The tasks differ only in what is given. During
 training the video and the motion get independent noise levels, so at sampling time a given modality is simply held at
 noise level zero while the other is denoised from pure noise.</p>
 <figure class="wide"><img src="figures/arch_tasks.jpg" width="2000" height="1250" loading="lazy" alt="The three tasks as given and generated tokens">
 <figcaption>The three tasks differ only in their conditioning. Given video latents show the clip's frames, and given motion
 shows its MHR body at the matching time, colored green to purple over time; generated tokens start as noise and are
-denoised. The first frame, the first pose and the caption are given in all three.</figcaption></figure>
+denoised. The first frame, the first pose and the text prompt are given in all three.</figcaption></figure>
 
 <h3>Data</h3>
 <p>We train on NymeriaPlus, an extension of the <a href="https://arxiv.org/abs/2406.09905">Nymeria</a> dataset, in which
@@ -181,7 +181,7 @@ left hand&hellip;&rdquo;).</p>
 <figcaption>A training example from NymeriaPlus, seen from behind the wearer, who opens and closes drawers, turns right and
 walks about 2.2&nbsp;m toward the stove. Top: six of the clip's 49 video frames. Middle: the MHR body every 0.67&nbsp;s,
 colored from green to purple, in a VGGT-&Omega; point cloud of the kitchen; each frame's border matches the body's color at the
-same time. Bottom: the caption.</figcaption></figure>
+same time. Bottom: the text prompt.</figcaption></figure>
 
 <h3>Architecture</h3>
 <p>We turn HunyuanVideo&nbsp;1.5 into a multimodal diffusion transformer (MM-DiT) with three streams. Motion tokens sit beside
@@ -206,15 +206,15 @@ modulation, projections and feed-forward network, and the three meet in a self-a
 It reads text features from HunyuanVideo's frozen text layers, so it sees the same features in the later phases.</li>
 <li><b>Joint finetuning.</b> All weights of the MM-DiT learn to denoise video and motion together. Each modality draws its own
 noise levels, so the model sees cleaner video beside noisier motion and the reverse, which covers all three tasks.</li>
-<li><b>Curriculum learning.</b> The caption is withheld and one modality is given clean, to make each stream use the other.</li>
+<li><b>Curriculum learning.</b> The text prompt is withheld and one modality is given clean, to make each stream use the other.</li>
 <li><b>Geometric post-training.</b> A 3D reward aligns the camera of the generated video with the generated head.</li>
 </ol>
 <p>The curriculum targets a shortcut. After joint finetuning, a generated video follows a given motion closely, but a
-generated motion largely ignores a given video. We suspect the caption already describes the action well enough to denoise
-the motion without looking at the video. For 5,000 updates, the curriculum replaces the caption with the empty one and gives
-one modality clean. It runs 2,000 updates of motion-conditioned video, then a 500-update ramp as the caption returns. Then
+generated motion largely ignores a given video. We suspect the text prompt already describes the action well enough to denoise
+the motion without looking at the video. For 5,000 updates, the curriculum replaces the text prompt with an empty one and gives
+one modality clean. It runs 2,000 updates of motion-conditioned video, then a 500-update ramp as the text prompt returns. Then
 come 2,000 updates in which half of the clips are given their video, so the motion trains as video-conditioned generation,
-while the other half denoise both modalities without a caption. A final 500-update ramp brings the caption back.</p>
+while the other half denoise both modalities without a text prompt. A final 500-update ramp brings the text prompt back.</p>
 
 <h2 id="geometry">Geometric post-training</h2>
 <p>The most visible sign of alignment is whether the head turns the way the camera pans, so for the last 2,500 updates we
