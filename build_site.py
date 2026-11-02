@@ -245,8 +245,12 @@ def pane(e, task, active):
     """One task of an example: its video beside its 3D scene (the figure's task under the example's own name)."""
     name = e["name"] if task == e["mode"] else f"{e['name']}__{task}"
     info = json.loads((site / "recordings" / "thesis" / f"{name}.json").read_text())
-    camera = (f"initialCameraPosition={','.join(map(str, info['position']))}"
-              f"&amp;initialCameraLookAt={','.join(map(str, info['look_at']))}&amp;initialCameraUp=0,0,1")
+    # The site camera frames the content like the figure's tight crop (make_thesis_scenes.site_camera). Without a
+    # field of view the viewer would use three.js's 75 deg, wider than the figure's 50.
+    position, look_at = info.get("site_position", info["position"]), info.get("site_look_at", info["look_at"])
+    camera = (f"initialCameraPosition={','.join(map(str, position))}"
+              f"&amp;initialCameraLookAt={','.join(map(str, look_at))}&amp;initialCameraUp=0,0,1"
+              f"&amp;initialCameraFov={info.get('site_fov', info['fov']):.4f}")
     t = TASKS[task]
     return (f'<div class="pane" data-task="{task}"{"" if active else " hidden"}><p class="task-note">{t["note"]}</p>'
             f'<div class="body" style="--aspect: {info["aspect"]:.3f}"><div class="video"><p class="panel-label">{t["video"]}</p>'

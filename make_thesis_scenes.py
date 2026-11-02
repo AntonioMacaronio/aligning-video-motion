@@ -1,7 +1,7 @@
 """Animated scenes of the thesis's Section 4.4 gallery for the site's main page.
 
     PYTHONPATH=<LVP tree with datasets/head_correction.py> python make_thesis_scenes.py \
-        <gallery dir> <figure-src gallery dir> <site dir> [--tasks <tasks dir>] [--videos-only] [name ...]
+        <gallery dir> <figure-src gallery dir> <site dir> [--tasks <tasks dir>] [--videos-only | --cameras-only] [name ...]
 
 <gallery dir> holds gallery_scene.py's scenes/<name>/{scene.npz,frames/} and the examples' inputs
 (<cohort>/motion/<clip>.pt); <figure-src gallery dir> is the thesis repo's figure-src/gallery-44-20261025
@@ -14,8 +14,9 @@ color ramp and occluder cut. For each of the twelve examples:
   and colored along the figure's green -> blue -> purple ramp by time;
 - the video is the example's 49 frames (scenes/<name>/frames) as a 10 fps mp4 in which every frame is a keyframe,
   because the page seeks it to the scene's playback time on every frame (video frame k = motion frame 3k).
-Writes <site>/recordings/thesis/<name>.viser and .json (the figure camera) and <site>/media/thesis/<name>.mp4;
---videos-only rewrites just the videos.
+Writes <site>/recordings/thesis/<name>.viser and .json (the figure camera, and the site's opening camera: see
+site_camera) and <site>/media/thesis/<name>.mp4; --videos-only rewrites just the videos, --cameras-only just the site
+cameras in the .json files.
 
 --tasks adds each example's other two tasks (the page's tabs): <tasks dir>/examples_tasks.json lists them as
 <example>__<task> with the evaluation's samples of the same clip, and <tasks dir> holds their scenes (built by
@@ -42,7 +43,8 @@ if "--tasks" in _rest:
     TASKS = Path(_rest[_i + 1])
     _rest = _rest[:_i] + _rest[_i + 2:]
 VIDEOS_ONLY = "--videos-only" in _rest
-NAMES = [name for name in _rest if name != "--videos-only"]
+CAMERAS_ONLY = "--cameras-only" in _rest
+NAMES = [name for name in _rest if name not in ("--videos-only", "--cameras-only")]
 sys.path.insert(0, str(FIGSRC.parent / "data-figure-20261023"))
 from render_datafig import occluders, ramp  # noqa: E402  the figure's own color ramp and occluder cut
 
@@ -154,6 +156,48 @@ def figure_points(scene, args):
     return points, colors, middle, saved
 
 
+def look_at_rotation(position, target):
+    """Camera-to-world rotation (OpenCV axes: x right, y down, z forward) of a camera at position looking at target, z up."""
+    forward = (target - position) / np.linalg.norm(target - position)
+    right = np.cross(forward, [0.0, 0.0, 1.0])
+    right /= np.linalg.norm(right)
+    return np.stack([right, np.cross(forward, right), forward], axis=1)
+
+
+def site_camera(points, bodies, view, fill=0.88):
+    """The site's opening camera: compose_gallery.py's --tight-crop as a camera. It stays at the figure camera's
+    position, turns to the centre of the content's box and narrows its field of view until the box fills `fill` of
+    the view, so the site shows what the figure shows, at the same perspective. The content is the cut point cloud
+    (1-99% of it, and none within 1 m of the camera, so stray and near-plane points do not count) and every stored body
+    snapshot (all of it). The look-at point, where the viewer orbits, sits on the centre ray at the content's depth; the
+    centring is damped, since a cloud spread in depth does not move linearly in the image as the camera turns. Returns
+    (position, look_at, vertical fov)."""
+    position = np.asarray(view["position"], float)
+    t, aspect = np.tan(float(view["fov"]) / 2), float(view.get("aspect") or 1.8)
+    bodies = bodies.reshape(-1, 3)
+    centroid = np.concatenate([points, bodies]).mean(0)
+    look_at = np.asarray(view["look_at"], float)
+
+    def box(rotation):
+        def extent(xyz, low, high, near):
+            cam = (xyz - position) @ rotation
+            cam = cam[cam[:, 2] > near]
+            x, y = cam[:, 0] / cam[:, 2] / (t * aspect), cam[:, 1] / cam[:, 2] / t
+            return np.percentile(x, low), np.percentile(x, high), np.percentile(y, low), np.percentile(y, high)
+        p, q = extent(points, 1, 99, 1.0), extent(bodies, 0, 100, 0.05)
+        return min(p[0], q[0]), max(p[1], q[1]), min(p[2], q[2]), max(p[3], q[3])
+
+    for _ in range(12):  # aim at the box centre, half a step at a time
+        rotation = look_at_rotation(position, look_at)
+        x0, x1, y0, y1 = box(rotation)
+        ray = rotation @ np.array([t * aspect * (x0 + x1) / 4, t * (y0 + y1) / 4, 1.0])
+        ray /= np.linalg.norm(ray)
+        look_at = position + ray * float((centroid - position) @ ray)
+    x0, x1, y0, y1 = box(look_at_rotation(position, look_at))
+    zoom = float(np.clip(fill / max(abs(x0), abs(x1), abs(y0), abs(y1)), 0.65, 4.0))
+    return position, look_at, float(2 * np.arctan(t / zoom))
+
+
 def encode_video(scene_dir, video):
     """The example's 49 frames as a 10 fps H.264 mp4, all keyframes so that seeking to any frame is immediate."""
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-framerate", "10", "-i", str(scene_dir / "frames" / "%02d.jpg"),
@@ -191,6 +235,15 @@ def main():
         args = figure_options(argv)
         snapshots, stored = scene["snapshots"].copy(), scene["vertices"].copy()
         points, colors, middle, view = figure_points(dict(scene), args)
+        site_position, site_look_at, site_fov = site_camera(points, stored, view)
+        if CAMERAS_ONLY:
+            target = SITE / "recordings" / "thesis" / f"{name}.json"
+            info = json.loads(target.read_text())
+            info.update(site_position=np.round(site_position, 3).tolist(), site_look_at=np.round(site_look_at, 3).tolist(),
+                        site_fov=round(site_fov, 4))
+            target.write_text(json.dumps(info))
+            print(name, "site camera", info["site_look_at"], f"fov {np.degrees(site_fov):.1f} deg", flush=True)
+            continue
         if len(points) > MAX_POINTS:
             pick = np.random.default_rng(0).choice(len(points), MAX_POINTS, replace=False)
             points, colors = points[np.sort(pick)], colors[np.sort(pick)]
@@ -226,6 +279,8 @@ def main():
         server.stop()
         info = dict(position=np.round(view["position"], 3).tolist(), look_at=np.round(view["look_at"], 3).tolist(),
                     up=[0.0, 0.0, 1.0], fov=float(view["fov"]), aspect=float(view.get("aspect") or 1.8),
+                    site_position=np.round(site_position, 3).tolist(), site_look_at=np.round(site_look_at, 3).tolist(),
+                    site_fov=round(site_fov, 4),
                     points=int(len(points)), frames=len(vertices), snapshot_error_m=error,
                     megabytes=round(target.stat().st_size / 1e6, 2))
         target.with_suffix(".json").write_text(json.dumps(info))
