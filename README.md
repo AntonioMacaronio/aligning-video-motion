@@ -8,6 +8,7 @@ a separate repo, `aligning-video-motion-samples` (GitHub Pages allows 1 GB per s
   interactive thesis examples and the playback script, and writes `index.html`; edit the template, not `index.html`.
 - `figures/`: the thesis figures the page shows, rendered from the thesis's PDFs by `make_post_figures.py` (macOS).
 - `recordings/thesis/`, `media/thesis/`: the examples' viser recordings and videos, from `make_thesis_scenes.py`.
+- `favicon.ico`, `favicon-32.png`, `apple-touch-icon.png`: the tab icon, a body mesh through a fisheye lens framed like an egocentric frame, from `make_favicon.py` (the gallery links to the same files).
 - `viser/`: the static viser client; each scene loads `viser/index.html?playbackPath=../recordings/thesis/<name>.viser`.
 - `gallery.html`: a redirect for old links to the gallery.
 

@@ -134,6 +134,10 @@ b = s.index("</header>") + len("</header>")
 s = s[:a] + HEADER + s[b:]
 s = re.sub(r"<title>.*?</title>", "<title>Aligning Egocentric Video and Human Motion Generation: gallery</title>",
            s, count=1, flags=re.S)
+# The project page's tab icon (make_favicon.py), from its URL.
+s = s.replace("</title>", f'</title><link rel="icon" href="{FIGURES_URL}favicon.ico" sizes="any">'
+              f'<link rel="icon" type="image/png" sizes="32x32" href="{FIGURES_URL}favicon-32.png">'
+              f'<link rel="apple-touch-icon" href="{FIGURES_URL}apple-touch-icon.png">', 1)
 
 for old, new in (('<button data-tab="training">Training (16/16)</button>', '<button data-tab="training">Training-split clips (16)</button>'),
                  ('<button data-tab="validation">Validation (48/48)</button>', '<button data-tab="validation">Held-out clips (48)</button>')):
