@@ -21,7 +21,8 @@ cameras in the .json files.
 --tasks adds each example's other two tasks (the page's tabs): <tasks dir>/examples_tasks.json lists them as
 <example>__<task> with the evaluation's samples of the same clip, and <tasks dir> holds their scenes (built by
 gallery_scene.py, or gallery_scene_local.py on a laptop) and inputs. Each uses its example's figure camera and
-views.json options, so the three tasks of a clip open at the same view.
+views.json options, so the three tasks of a clip open at the same view, unless <tasks dir>/cameras/<name>.json holds a
+view saved for that tab in the figure viewer (render_datafig.py --interactive), which then replaces the figure camera.
 """
 import argparse
 import json
@@ -228,6 +229,8 @@ def main():
             continue
         scene = dict(np.load(scene_dir / "scene.npz"))
         camera = FIGSRC / "cameras" / f"{base}.json"
+        if root is TASKS and (TASKS / "cameras" / f"{name}.json").exists():  # a tab with its own saved view
+            camera = TASKS / "cameras" / f"{name}.json"
         extras = views.get(base, views["default"])
         height = round(2400 / (json.loads(camera.read_text()).get("aspect") or 2.4))
         argv = ["--width", "2400", "--height", str(height), *COMMON,
