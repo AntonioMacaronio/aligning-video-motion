@@ -60,12 +60,12 @@ footer { font-size: 13.5px; color: var(--muted); text-align: center; max-width: 
 /* Beside the text column it fades while a wide element passes; from 1640 px it sits outside the wide column instead. */
 @media (max-width: 1639px) { .toc.dim { opacity: 0; pointer-events: none; } }
 @media (min-width: 1640px) { .toc { left: calc(50vw - var(--text) / 2 - var(--side) - 210px); } }
-/* The thesis figures viewer: one example on the stage, picked from the strip of thumbnails below it. The stage and the
-   strip share one width, and the strip's twelve thumbnails divide it evenly (two rows of six on narrow screens). */
-.stage, .strip { max-width: 1096px; margin-left: auto; margin-right: auto; }
+/* The thesis figures viewer: one example on the stage, picked from the strip of thumbnails below it, both inside one
+   bordered card. The strip's twelve thumbnails divide the card's width evenly (two rows of six on narrow screens). */
+.viewer { max-width: 986px; margin-left: auto; margin-right: auto; background: #fff; border: 1px solid #d8dde3; border-radius: 8px; padding: 14px 16px 16px; }
 .stage .example { margin: 0; border: 0; padding: 0; }
 .stage .example .caption { min-height: 42px; }
-.strip { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 8px; margin-top: 18px; margin-bottom: 4px; }
+.strip { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
 @media (max-width: 720px) { .strip { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 .thumb { width: 100%; aspect-ratio: 1; padding: 0; border: 2px solid transparent; border-radius: 8px; background: #fff; cursor: pointer; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.18); transition: transform 0.15s, box-shadow 0.15s; }
 .thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
