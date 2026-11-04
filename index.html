@@ -134,46 +134,43 @@ footer { font-size: 13.5px; color: var(--muted); text-align: center; max-width: 
 </section>
 
 <h2 id="overview">Overview</h2>
-<p>When you wear a camera on your head, the video it records and the way your body moves are two views of the same event.
-The camera pans exactly when your head turns, and your hands appear in the frame when your arms bring them there. We build
-one model that generates egocentric video and the wearer's full-body motion together, or either one given the other. It
-extends the 8.3-billion-parameter video diffusion model <a href="https://arxiv.org/abs/2511.18870">HunyuanVideo&nbsp;1.5</a>
-with a motion stream, and it is trained on about 180 hours of paired video and motion from
+<p>When you wear a camera on your head, the video it records is reflective of the way your body moves.
+For example, the camera pans exactly how your head turns, and your hands appear in the frame when your arms bring them there. We build
+one model that generates egocentric video and the wearer's full-body motion together, or either one given the other. We
+extend the 8.3-billion-parameter video diffusion model <a href="https://arxiv.org/abs/2511.18870">HunyuanVideo&nbsp;1.5</a>
+with a motion stream and train it on about 180 hours of paired video and motion from
 <a href="https://arxiv.org/abs/2603.18496">NymeriaPlus</a>.</p>
-<p>A model trained only to denoise each modality learns their agreement implicitly, and it leaves a gap: the camera in its
-generated video and its generated head turn differently. We close part of that gap in two ways. A curriculum hides the
+<p>A model trained only to denoise each modality might learn their agreement implicitly, but has noticeable inconsistency. For example, the camera movement of its
+generated video and its generated head turn differently and contradict one another. We close part of this inconsistency in two ways, one implicit and one explicit. The former is a curriculum that hides the
 text prompt and gives one modality clean, so that each stream has to read the other. Geometric post-training then scores the
-model's own samples with VGGT-&Omega;, a 3D reconstruction model, by comparing the camera it recovers from the generated video
-with the generated head. Making that reward affordable for an 8B-parameter video model is the main engineering problem we
+model's own samples with VGGT-&Omega;, a 3D reconstruction model. We do this by comparing the camera trajectory VGGT-&Omega; extracts from the generated video
+with the generated head pose trajectory. Making this gradient affordable for an 8B-parameter video model with 20k+ tokens and 50 sampling steps is the main engineering problem we
 solve. We copy the reward's gradient onto a single, randomly drawn denoising step, weighted so that the update is an
 unbiased estimate of the full copied gradient, and we compute the reward on a separate sidecar node.</p>
 <p>Compared with joint finetuning alone for the same number of updates, the full recipe lowers the rotation error between
-the generated video's camera and the generated head from 21.5&deg; to 16.7&deg;. It also brings both modalities closer to
+the generated video's camera and the generated head from 21.5&deg; to 16.7&deg;. It also brings both modalities distributions closer to that of
 real data: the video FID falls from 71.7 to 63.8, and the motion's Fr&eacute;chet distance from 42.6 to 28.2.</p>
 
 <h2 id="motivation">Why align video and motion?</h2>
-<p>Diffusion transformers increasingly generate several modalities at once.
+<p>Modern diffusion transformers generate multiple modalities at once.
 <a href="https://arxiv.org/abs/2403.03206">Stable Diffusion&nbsp;3</a> lets text and image tokens attend to each other
 throughout denoising, <a href="https://arxiv.org/abs/2602.15922">DreamZero</a> extends a video model to predict video and
 robot actions together, and <a href="https://arxiv.org/abs/2508.13013">EgoTwin</a> generates egocentric video and human
-motion jointly. In each case the streams learn to agree only through the data. Each modality is trained to denoise toward
-its own target, so nothing in the objective penalizes a video and a motion that describe different events.</p>
-<p>Egocentric video gives us a direct way to measure that disagreement. The camera is mounted on the wearer's glasses, so
-the camera trajectory implied by the video should match the head in the motion. We recover the camera's rotation from a
-video with VGGT-&Omega; and compare it with the head's, both relative to the first frame. On recorded video and recorded
-motion the two differ by only about 4&deg; on average, so the measurement itself is accurate. After a pretrained video model is adapted to
-joint generation, the camera of its generated video and its generated head differ by 22&deg; on average.</p>
-<p>The obvious fix is to optimize this agreement directly: treat the frozen estimator as a differentiable reward and
+motion jointly. In each case the modality streams learn to agree only through data. Each modality is trained to denoise toward
+its own target, but nothing in the objective directly penalizes a video and a motion that describe different events.</p>
+<p>In egocentric video, such disagreement is the most visible: the camera is mounted on the wearer's glasses, so
+the camera trajectory implied by the video should match the head pose's motion. We recover the camera's rotation from a
+video with VGGT-&Omega; and compare it with the head's, both relative to the first frame. On the ground truth recorded video and recorded
+motion the two differ by only about 4&deg, a slight inconsistency. However, when a pretrained video model is adapted to
+joint generation through existing methods of finetuning, the camera of its generated video and its generated head differ by 22&deg on average.</p>
+<p>One direct fix is to optimize this agreement directly. We can treat the frozen estimator as a differentiable reward and
 backpropagate through the sampler, as reward-finetuning methods such as <a href="https://arxiv.org/abs/2309.17400">DRaFT</a>
-and <a href="https://arxiv.org/abs/2310.03739">AlignProp</a> do for images. For an 8B-parameter video model, that means
+and <a href="https://arxiv.org/abs/2310.03739">AlignProp</a> do for images. However, this is a problem for an 8B-parameter video model because it means
 differentiating through dozens of denoising steps, the video decoder and the estimator, which is prohibitively expensive in
-both memory and time. Much of this post is about how we get a useful gradient without doing that.</p>
+both memory and time. In this project, we integrate some techniques to make this more tractable.</p>
 
 <h2 id="model">One model, three tasks</h2>
-<p>Each training clip pairs 4.8 seconds of egocentric video with the wearer's full-body motion and a text prompt describing the wearer's actions. The motion
-keeps all 145 frames at 30&nbsp;fps, and the video keeps every third frame (49 frames at 10&nbsp;fps), so video frame
-\(k\) is motion frame \(3k\). Given the first frame, the first pose and the text prompt, one model handles three tasks: joint
-generation of both, video-conditioned motion, and motion-conditioned video. The tasks differ only in what is given. During
+<p> The tasks differ only in what is given. During
 training the video and the motion get independent noise levels, so at sampling time a given modality is simply held at
 noise level zero while the other is denoised from pure noise.</p>
 <figure class="wide"><img src="figures/arch_tasks.jpg" width="2000" height="1250" loading="lazy" alt="The three tasks as given and generated tokens">
@@ -184,13 +181,9 @@ denoised. The first frame, the first pose and the text prompt are given in all t
 <h3>Data</h3>
 <p>We train on NymeriaPlus, an extension of the <a href="https://arxiv.org/abs/2406.09905">Nymeria</a> dataset, in which
 people do everyday activities while wearing <a href="https://arxiv.org/abs/2308.13561">Project Aria</a> glasses and an
-inertial motion-capture suit. NymeriaPlus fits the wearer's body with the MHR body model, in the same coordinate frame as
-the glasses. We use 790 recordings from 196 participants, about 200 hours, and hold out 20 participants entirely, so every
-result on this page is on people the model never saw in training. Nymeria's narrations are written in the third person
-about the wearer (&ldquo;C places the ball on the table with her left hand&hellip;&rdquo;) and mention other people and
-actions that involve no movement. We rewrite each one with a language model into first-person instructions that describe
-only the wearer's own movements (&ldquo;First Person POV: Sit on the living room sofa. Place the ball on the table with your
-left hand&hellip;&rdquo;).</p>
+inertial motion-capture suit. We use 790 recordings from 196 participants, about 200 hours, and hold out 20 participants entirely, so every
+result on this page is on people the model never saw in training. Each training clip pairs 4.8 seconds of egocentric video with the wearer's 
+full-body motion and a text prompt describing the wearer's actions.</p>
 <figure class="wide"><img src="figures/data_example_kitchen_walk.jpg" width="2000" height="1604" loading="lazy" alt="A training example from NymeriaPlus">
 <figcaption>A training example from NymeriaPlus, seen from behind the wearer, who opens and closes drawers, turns right and
 walks about 2.2&nbsp;m toward the stove. Top: six of the clip's 49 video frames. Middle: the MHR body every 0.67&nbsp;s,
@@ -240,11 +233,11 @@ both trajectories relative to their first frame, \(\tilde R^k = (\hat R^0)^\top 
 \(\tilde C^k = (C^0)^\top C^k\), and the loss is the mean angle between them:</p>
 $$\mathcal{L}_{\text{geom}} = \frac{1}{N+1}\sum_{k=0}^{N} \angle\big((\tilde R^k)^\top \tilde C^k\big), \qquad \angle(R) = \arccos\frac{\operatorname{tr} R - 1}{2}.$$
 <p>We use only rotations because VGGT-&Omega;'s translations come in an arbitrary scale. The joint-finetuning loss on real
-data stays on throughout, and the geometric loss is added with weight \(\lambda_{\text{geom}} = 0.005\). The hard part is
-not the loss but its gradient.</p>
+data stays on throughout, and the geometric loss is added with weight \(\lambda_{\text{geom}} = 0.005\). The main difficulty
+is computing the gradient within a budgeted memory constraint.</p>
 
 <h3 id="copied-gradient">Copying the gradient through diffusion time</h3>
-<p>The sampler takes \(S = 50\) Euler steps. At step \(n\), the model looks at the noisy video latent \(z_n\) and the noisy
+<p>The first reduction in memory is to reduce the number of gradients needed to compute through the sampling chain. We do this by copying the gradient from the endpoint to every step. The sampler takes \(S = 50\) Euler steps. At step \(n\), the model looks at the noisy video latent \(z_n\) and the noisy
 motion \(x_n\), and it predicts a video velocity \(\hat v_n\) and a clean motion \(\hat x_n\). Each modality then steps along
 its own noise schedule, \(\varphi\) for the video and \(\sigma\) for the motion:</p>
 $$z_{n+1} = z_n + \Delta\varphi_n\,\hat v_n, \qquad x_{n+1} = x_n + \Delta\sigma_n\,\frac{x_n - \hat x_n}{\sigma_n}.$$
