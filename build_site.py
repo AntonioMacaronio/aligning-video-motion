@@ -230,13 +230,16 @@ s = s.replace(old, f'if (location.hash === "#results") location.replace("{FIGURE
     f'</script></head><body><p>The gallery moved to <a href="{SAMPLES_URL}">{SAMPLES_URL}</a>.</p></body></html>\n')
 
 TASKS = {
-    "joint": dict(label="Joint generation", note="The video and the motion are both generated from the text prompt and the "
-                  "first video frame.", video="Generated video", motion="Generated motion"),
-    "motion_cond": dict(label="Motion-conditioned video", note="The video is generated from the text prompt, the first frame "
-                        "and the recorded motion shown.", video="Generated video", motion="Input motion (recorded)"),
-    "video_cond": dict(label="Video-conditioned motion", note="The motion is generated from the text prompt and the recorded "
-                       "video shown.", video="Input video (recorded)", motion="Generated motion"),
+    "joint": dict(label="Generate both", note="The video and the motion are both generated from the text prompt and the "
+                  "first video frame.", video="Generated video", motion="Generated motion", given=()),
+    "motion_cond": dict(label="Video from motion", note="The video is generated from the text prompt, the first frame "
+                        "and the recorded motion shown.", video="Generated video", motion="Input motion (recorded)",
+                        given=("motion",)),
+    "video_cond": dict(label="Motion from video", note="The motion is generated from the text prompt and the recorded "
+                       "video shown.", video="Input video (recorded)", motion="Generated motion", given=("video",)),
 }
+
+# The arrow between a conditioned task's panels points from the given modality to the generated one.
 SECTIONS = (("joint", "Figures 4.1 and 4.2"), ("motion_cond", "Figures 4.3 and 4.4"), ("video_cond", "Figures 4.5 and 4.6"))
 examples = json.loads((site / "thesis_examples.json").read_text())
 for video in sorted((site / "media" / "thesis").glob("*.mp4")):
@@ -256,8 +259,11 @@ def pane(e, task, active):
               f"&amp;initialCameraLookAt={','.join(map(str, look_at))}&amp;initialCameraUp=0,0,1"
               f"&amp;initialCameraFov={info.get('site_fov', info['fov']):.4f}")
     t = TASKS[task]
+    flow = {("video",): "right", ("motion",): "left"}.get(t["given"])
+    arrow = f'<span class="flow {flow}" aria-hidden="true"></span>' if flow else ""
     return (f'<div class="pane" data-task="{task}"{"" if active else " hidden"}><p class="task-note">{t["note"]}</p>'
-            f'<div class="body" style="--aspect: {info["aspect"]:.3f}"><div class="video"><p class="panel-label">{t["video"]}</p>'
+            f'<div class="body" style="--aspect: {info["aspect"]:.3f}"><div class="video">{arrow}'
+            f'<p class="panel-label">{t["video"]}</p>'
             f'<video src="media/thesis/{name}.mp4" poster="media/thesis/{name}.jpg" muted loop playsinline preload="none">'
             f'</video></div><div class="motion"><p class="panel-label">{t["motion"]}</p><div class="scene">'
             f'<div class="hint">the 3D scene loads when the example is fully on screen</div>'
