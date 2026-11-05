@@ -9,9 +9,11 @@
 <!-- The page source: build_site.py fills the STAGE, THUMBS, GALLERY_URL, FOOTER and SCRIPT slots and writes index.html.
      Edit this file, not index.html. -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="explainer/geometry.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
   onload="renderMathInElement(document.querySelector('main'), {delimiters: [{left: '$$', right: '$$', display: true}, {left: '\\(', right: '\\)', display: false}]})"></script>
+<script defer src="explainer/geometry.js"></script>
 <style>
 :root { --text: 840px; --side: 220px; --ink: #1f2328; --muted: #57606a; --rule: #e5e7eb; --link: #2b6cb0; }
 * { box-sizing: border-box; }
@@ -238,6 +240,93 @@ come 2,000 updates in which half of the clips are given their video, so the moti
 while the other half denoise both modalities without a text prompt. A final 500-update ramp brings the text prompt back.</p>
 
 <h2 id="geometry">Geometric post-training</h2>
+<!-- The method as one story, played live (explainer/geometry.js; its lines, their ids and lengths in seconds are here). -->
+<section class="wide gx" id="gx" aria-label="Geometric post-training, explained">
+<div class="gx-card">
+<div class="gx-head">
+<button class="gx-prev" aria-label="Back a line"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8H3M7 4L3 8l4 4"/></svg></button>
+<div class="gx-words" aria-live="polite">
+<div class="gx-beat">
+<p class="gx-title">Our model makes a video and a motion together.</p>
+<div class="gx-ledes">
+<p class="gx-lede" data-id="noise" data-dur="7">It starts from pure noise: a scrambled video and a scrambled body motion.</p>
+<p class="gx-lede" data-id="step" data-dur="8">A network \(f_\theta\) looks at the noisy pair \(y_n\) and makes it a little cleaner.</p>
+<p class="gx-lede" data-id="steps" data-dur="10">It repeats this 50 times, for \(n = 0, \dots, 49\). Each pass is one sampling step.</p>
+<p class="gx-lede" data-id="sample" data-dur="7">The result \(y_S\): a video seen through the wearer&rsquo;s glasses, and the motion of their body.</p>
+</div>
+</div>
+<div class="gx-beat">
+<p class="gx-title">In a real recording, the camera is worn on the head.</p>
+<div class="gx-ledes">
+<p class="gx-lede" data-id="worn" data-dur="8">The video is filmed from glasses on the wearer&rsquo;s face, so whenever the head turns, the camera turns with it.</p>
+<p class="gx-lede" data-id="drift" data-dur="7">A generated sample should behave the same way. But nothing forces it to.</p>
+</div>
+</div>
+<div class="gx-beat">
+<p class="gx-title">So we score each sample on whether the two agree.</p>
+<div class="gx-ledes">
+<p class="gx-lede" data-id="vggt" data-dur="8">A frozen 3D model, VGGT-&Omega;, reads off which way the video&rsquo;s camera points in every frame.</p>
+<p class="gx-lede" data-id="calib" data-dur="7">The headset&rsquo;s calibration turns the generated head into a camera, too.</p>
+<p class="gx-lede" data-id="score" data-dur="10">The score \(\mathcal{L}_{\text{geom}}\) is the angle between the two cameras, averaged over the 49 frames. Lower is better.</p>
+</div>
+</div>
+<div class="gx-beat">
+<p class="gx-title">To improve, change the weights \(\theta\) to shrink the angle.</p>
+<div class="gx-ledes">
+<p class="gx-lede" data-id="g" data-dur="8">Backpropagation finds how the finished sample should change to lower the score: the endpoint gradient \(g\).</p>
+<p class="gx-lede" data-id="chain" data-dur="11">But \(\theta\) shapes every step. The exact gradient has one term per step, and each term carries \(g\) back through all the steps after it.</p>
+</div>
+</div>
+<div class="gx-beat">
+<p class="gx-title">Going back through the steps takes a lot of memory.</p>
+<div class="gx-ledes">
+<p class="gx-lede" data-id="acts" data-dur="8">To carry \(g\) back through a step, we need what that step computed on the way forward: its activations.</p>
+<p class="gx-lede" data-id="oom" data-dur="10">Keeping them for all 50 passes of an 8B-parameter model over a 20,800-token video piles up far past what a GPU can hold.</p>
+</div>
+</div>
+<div class="gx-beat">
+<p class="gx-title">Shortcut 1: copy \(g\) to every step.</p>
+<div class="gx-ledes">
+<p class="gx-lede" data-id="copy" data-dur="10">Pretend each step&rsquo;s output reaches the finished sample unchanged, and hand \(g\) straight to it. The chain drops out.</p>
+<p class="gx-lede" data-id="many" data-dur="9">This is FDFO&rsquo;s copied gradient. But the sum still has 50 terms, and each one is a backward pass through \(f_\theta\).</p>
+</div>
+</div>
+<div class="gx-beat">
+<p class="gx-title">Shortcut 2: keep one term, picked at random.</p>
+<div class="gx-ledes">
+<p class="gx-lede" data-id="draw" data-dur="9">Before sampling, draw one step \(n\) with probability \(p_n\). The late, nearly clean steps come up most often.</p>
+<p class="gx-lede" data-id="nograd" data-dur="9">Run all 50 steps without gradients, keeping only step \(n\)&rsquo;s input. Memory stays nearly empty.</p>
+<p class="gx-lede" data-id="rerun" data-dur="10">Then re-run step \(n\) with gradients, give it \(g\), and divide by \(p_n\). That single term is our estimate \(\hat G\).</p>
+</div>
+</div>
+<div class="gx-beat">
+<p class="gx-title">On average, the estimate is the copied gradient.</p>
+<div class="gx-ledes">
+<p class="gx-lede" data-id="cancel" data-dur="9">Dividing by \(p_n\) cancels the chance of drawing step \(n\), so in expectation all 50 terms come back.</p>
+<p class="gx-lede" data-id="converge" data-dur="12">Over many updates the estimates average out to \(G_{\text{copy}}\), for one backward pass of one step each.</p>
+</div>
+</div>
+</div>
+<button class="gx-next" aria-label="Forward a line"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg></button>
+</div>
+<div class="gx-stage"></div>
+<div class="gx-scrub">
+<div class="gx-time">
+<div class="gx-track" role="slider" aria-label="Animation time" tabindex="0"></div>
+<div class="gx-parts">
+<button class="gx-part" data-from="noise">Making a sample</button>
+<button class="gx-part" data-from="worn">Scoring it</button>
+<button class="gx-part" data-from="g">The memory problem</button>
+<button class="gx-part" data-from="copy">Our estimate</button>
+</div>
+</div>
+<div class="gx-buttons">
+<button class="gx-play" aria-label="Pause"><svg class="i-pause" viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3" height="11" rx="1"/><rect x="9.5" y="2.5" width="3" height="11" rx="1"/></svg><svg class="i-play" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 2.8v10.4L13 8z"/></svg></button>
+<button class="gx-replay" aria-label="Replay this part" title="Replay this part"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.2 8.6A5.3 5.3 0 1 1 11.7 4"/><path d="M12.2 1.6v2.9H9.3"/></svg></button>
+</div>
+</div>
+</div>
+</section>
 <p>The most visible sign of alignment is whether the head turns the way the camera pans, so for the last 2,500 updates we
 score the model's own samples on exactly that. Each training GPU generates a joint sample with the full 50-step sampler,
 decodes its video latent into 49 frames, and runs VGGT-&Omega; on them to recover the camera's rotation \(\hat R^k\) at every

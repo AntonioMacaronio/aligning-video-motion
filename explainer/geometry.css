@@ -1,0 +1,79 @@
+/* The geometric post-training explainer (#gx, explainer/geometry.js): a bordered card with the current line above the
+   stage, the stage (an SVG, with a layer of KaTeX labels and the line of math laid over it in the same 960 x 540 units; the SVG's
+   scene and its labels move together with the camera, the line of math stays put),
+   and the seek bar with the story's parts under it. */
+.gx { margin: 8px 0 34px; }
+.gx-card { max-width: 960px; margin: 0 auto; border: 1px solid #d8dde3; border-radius: 10px; padding: 14px 16px 12px; background: #fff; }
+.gx-head { display: grid; grid-template-columns: 32px 1fr 32px; gap: 10px; align-items: start; }
+.gx-prev, .gx-next { width: 32px; height: 32px; margin-top: 3px; border: 1px solid #d8dde3; border-radius: 7px; background: #fff;
+  color: #57606a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+.gx-prev:hover, .gx-next:hover { border-color: #9aa4b1; color: var(--ink); }
+.gx-prev svg, .gx-next svg { width: 16px; height: 16px; }
+/* Every beat (and every line of a beat) sits in one grid cell, so the card keeps the height of the longest. */
+.gx-words { display: grid; text-align: center; }
+.gx-beat { grid-area: 1 / 1; opacity: 0; transition: opacity 0.35s; pointer-events: none; }
+.gx-beat.on { opacity: 1; pointer-events: auto; }
+.gx-title { font-size: 19px; font-weight: 650; line-height: 1.35; margin: 2px 0 3px; }
+.gx-ledes { display: grid; }
+.gx-lede { grid-area: 1 / 1; margin: 0; font-size: 16px; line-height: 1.5; color: #374151; opacity: 0; transition: opacity 0.35s; }
+.gx-lede.on { opacity: 1; }
+.gx-stage { position: relative; width: 100%; aspect-ratio: 960 / 540; margin-top: 6px; overflow: hidden; }
+.gx-stage > svg { position: absolute; inset: 0; width: 100%; height: 100%; font-family: inherit; }
+.gx-math { position: absolute; left: 0; top: 0; width: 960px; height: 540px; transform-origin: 0 0; pointer-events: none; }
+.gx-scene { position: absolute; left: 0; top: 0; width: 960px; height: 540px; transform-origin: 0 0; }
+.gx-m { position: absolute; white-space: nowrap; line-height: 1; }
+.gx-m .katex { font-size: 1em; }
+.gx-word { font-family: inherit; }
+.gx-chip { background: #fff; border: 1.6px solid #dc2626; border-radius: 7px; padding: 5px 9px 6px; }
+/* The line of math: one row per formula, all in one cell; each formula's pieces shrink or grow (geometry.js), so the
+   formula reflows as it turns into the next. */
+.gx-band { position: absolute; left: 0; top: 402px; width: 960px; display: grid; justify-items: center; }
+.gx-row { grid-area: 1 / 1; display: flex; flex-direction: column; align-items: center; }
+.gx-eq { display: flex; align-items: center; justify-content: center; font-size: 24px; color: var(--ink); min-height: 80px; }
+.gx-note { font-size: 13.5px; color: #57606a; margin-top: 4px; }
+/* Every piece spans the row's height, so the labels under (or over) them line up. */
+.gx-piece { position: relative; display: inline-flex; align-items: center; align-self: stretch; border-radius: 7px; transition: background-color 0.2s; }
+.gx-inner { display: inline-block; overflow: hidden; white-space: nowrap; padding: 3px 3px; }
+.gx-strike { position: absolute; left: 3px; top: 50%; height: 3px; width: 0; background: #dc2626; border-radius: 2px;
+  transform: rotate(-9deg); transform-origin: left center; pointer-events: none; }
+.gx-brace { position: absolute; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center;
+  font-size: 12.5px; white-space: nowrap; opacity: 0; width: max(100%, 10px); }
+.gx-brace i { display: block; width: calc(100% - 8px); height: 5px; border: 1.6px solid currentColor; border-top: 0; border-radius: 0 0 4px 4px; }
+.gx-brace b { font-weight: 500; margin-top: 1px; }
+.gx-brace.below { top: calc(100% - 3px); }
+.gx-brace.below.row1 b { margin-top: 16px; }
+.gx-brace.above { bottom: calc(100% - 3px); flex-direction: column-reverse; }
+.gx-brace.above i { border-top: 1.6px solid currentColor; border-bottom: 0; border-radius: 4px 4px 0 0; }
+.gx-brace .katex { font-size: 1.05em; }
+/* The seek bar: one segment per line, grouped by part; the parts' names under it, the current one dark. */
+.gx-scrub { display: flex; align-items: flex-start; gap: 12px; margin-top: 4px; }
+.gx-time { flex: 1; min-width: 0; }
+.gx-track { position: relative; display: flex; gap: 10px; height: 20px; align-items: center; cursor: pointer; touch-action: none; }
+.gx-chap { position: relative; display: flex; gap: 2px; flex: 1 1 0; }
+.gx-seg { position: relative; flex: 1 1 0; height: 5px; border-radius: 3px; background: #e5e7eb; overflow: hidden; }
+.gx-seg i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #2b6cb0; }
+.gx-knob { position: absolute; top: 50%; width: 13px; height: 13px; margin-left: -6.5px; margin-top: -6.5px; border-radius: 50%;
+  background: #2b6cb0; box-shadow: 0 0 0 3px #fff; pointer-events: none; }
+.gx-track:focus-visible { outline: 2px solid #2b6cb0; outline-offset: 3px; border-radius: 4px; }
+.gx-parts { display: flex; gap: 10px; }
+.gx-part { flex: 1 1 0; min-width: 0; border: 0; background: none; padding: 2px 0; font: inherit; font-size: 13.5px; color: #8b949e;
+  cursor: pointer; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gx-part:hover { color: #57606a; }
+.gx-part.on { color: var(--ink); font-weight: 600; }
+.gx-buttons { display: flex; gap: 6px; }
+.gx-play, .gx-replay { width: 32px; height: 32px; border-radius: 50%; padding: 0; cursor: pointer; display: flex; align-items: center;
+  justify-content: center; }
+.gx-play { border: 0; background: #2b6cb0; color: #fff; }
+.gx-play:hover { background: #245a93; }
+.gx-replay { border: 1px solid #d8dde3; background: #fff; color: #57606a; }
+.gx-replay:hover { border-color: #9aa4b1; color: var(--ink); }
+.gx-play svg, .gx-replay svg { width: 15px; height: 15px; }
+.gx-play .i-play { display: none; }
+.gx-play.paused .i-play { display: block; }
+.gx-play.paused .i-pause { display: none; }
+@media (max-width: 600px) {
+  .gx-card { padding: 10px 8px 10px; }
+  .gx-title { font-size: 16.5px; }
+  .gx-lede { font-size: 14.5px; }
+  .gx-part { font-size: 11.5px; }
+}
