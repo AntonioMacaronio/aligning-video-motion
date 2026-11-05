@@ -301,10 +301,6 @@ step, but it stops sampling there and scores that step's one-step prediction of 
 score the real output, and reweight the step by \(1/p_n\) so that the expectation is the full copied gradient. FDFO trains on
 every step of a rollout, but one rollout of our video is costly enough that we can afford only one rollout, and one re-run
 step, per GPU per update.</p>
-<p>One caveat: before it is applied, the geometric gradient is capped at a quarter of the norm of the data gradient,
-\(G = G_{\text{data}} + \min\big(1,\, 0.25\,\lVert G_{\text{data}}\rVert / \lVert\lambda_{\text{geom}}\hat G\rVert\big)\,\lambda_{\text{geom}}\hat G\),
-and the total is clipped at norm 1. Both operations are nonlinear, so the update actually applied is not exactly unbiased,
-even though \(\hat G\) is an unbiased estimate of \(G_{\text{copy}}\).</p>
 
 <h3 id="sidecar">The geometry sidecar</h3>
 <p>The copied gradient makes the generator's side cheap: one gradient-free rollout and one re-run step. The reward is still
