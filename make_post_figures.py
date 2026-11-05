@@ -2,11 +2,17 @@
 
     python3 make_post_figures.py <thesis repo> <site repo>
 
-Writes <site>/figures/<name>.jpg for figures with renders or photos in them and .png for line drawings, at a width
-of about twice the width the page shows them at; and figures/thumbs/<example>.jpg, the thesis figures viewer's
-thumbnails: the 3D panel of each Section 4.4 figure (figures/gallery/<example>.pdf), cropped to a square around its bodies.
+Writes <site>/figures/<name>.jpg for figures with renders or photos in them, at a width of about twice the width the
+page shows them at, and <name>.svg for the line drawings, so they stay sharp when the page is zoomed. The SVG is the
+drawing's own source: the thesis's figure-src/architecture-20261024/make_fig_*.py output, which rsvg-convert also turns
+into the thesis PDF (the two render identically), with its text outlined by rsvg-convert so no fonts are needed. Every
+figure is cropped to its content, since the page shows it at the text column's width. Also writes
+figures/thumbs/<example>.jpg, the thesis figures viewer's thumbnails: the 3D panel of each Section 4.4 figure
+(figures/gallery/<example>.pdf), cropped to a square around its bodies.
 """
 import json
+import re
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -16,11 +22,11 @@ import Quartz
 from PIL import Image
 
 THESIS, SITE = Path(sys.argv[1]), Path(sys.argv[2])
-# name: (format, pixel width)
-FIGURES = {"arch_tasks": ("jpg", 2000), "data_example_kitchen_walk": ("jpg", 2000), "arch_block": ("png", 1600),
-           "arch_sidecar": ("png", 2000)}
-# Figures shown at the text column's width: their white page margins are trimmed, so the drawing meets the text's edges.
-TRIM = {"arch_block"}
+# name: (format, pixel width of the render that finds the content box)
+FIGURES = {"arch_tasks": ("jpg", 2000), "data_example_kitchen_walk": ("jpg", 2000), "arch_block": ("svg", 1600),
+           "arch_sidecar": ("svg", 2000)}
+# The line drawings' scripts, in the thesis's figure-src/architecture-20261024 (arguments before the output path)
+VECTOR = {"arch_block": ["make_fig_block.py", "shapes.json"], "arch_sidecar": ["make_fig_sidecar.py"]}
 
 
 def render(pdf, out, width, kind):
@@ -75,15 +81,48 @@ def thumbnail(im, size=176):
 
 
 (SITE / "figures").mkdir(exist_ok=True)
+def content_box(png):
+    """The box (x0, y0, x1, y1) of a render's non-white pixels: the page's white margins are trimmed off, so the drawing
+    meets the text column's edges."""
+    ys, xs = np.nonzero(np.asarray(Image.open(png).convert("RGB")).min(axis=2) < 245)
+    return int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1
+
+
+# A shape's own opacity becomes stroke and fill opacity before outlining. rsvg-convert writes opacity as a group with a
+# mask, and browsers drop a mask on a zero-width shape such as a vertical line, which hid the tensors' stripes in Chrome.
+# For a single shape the two are the same up to where its fill and stroke overlap (6 of 2.7M pixels differ).
+SHAPE_OPACITY = re.compile(r'<(line|rect|path|circle|ellipse|polygon|polyline)\b([^>]*?) opacity="([\d.]+)"')
+
+
+def vector(name, box, render_width, out):
+    """The drawing's SVG with its text outlined, its viewBox cropped to the render's content box."""
+    src = THESIS / "figure-src" / "architecture-20261024"
+    with tempfile.TemporaryDirectory() as tmp:
+        raw = Path(tmp) / f"{name}.svg"
+        subprocess.run([sys.executable, *VECTOR[name], str(raw)], cwd=src, check=True, stdout=subprocess.DEVNULL)
+        raw.write_text(SHAPE_OPACITY.sub(r'<\1\2 stroke-opacity="\3" fill-opacity="\3"', raw.read_text()))
+        svg = subprocess.run(["rsvg-convert", "-f", "svg", str(raw)], check=True, capture_output=True, text=True).stdout
+    head = re.search(r'<svg [^>]*width="([\d.]+)(?:pt|px)?" height="([\d.]+)(?:pt|px)?" viewBox="0 0 ([\d.]+) ([\d.]+)"', svg)
+    scale = float(head.group(3)) / render_width                  # SVG units per render pixel
+    x0, y0, x1, y1 = (round(v * scale, 2) for v in box)
+    w, h = round(x1 - x0, 2), round(y1 - y0, 2)
+    svg = svg.replace(head.group(0), head.group(0).split(" width=")[0] + f' width="{w}" height="{h}" viewBox="{x0} {y0} {w} {h}"', 1)
+    out.write_text(svg)
+    return w, h
+
+
 for name, (kind, width) in FIGURES.items():
     out = SITE / "figures" / f"{name}.{kind}"
-    w, h = render(THESIS / "figures" / f"{name}.pdf", out, width, kind)
-    if name in TRIM:
-        im = Image.open(out).convert("RGB")
-        ys, xs = np.nonzero(np.asarray(im).min(axis=2) < 245)
-        im = im.crop((int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1))
-        im.save(out)
-        w, h = im.size
+    with tempfile.TemporaryDirectory() as tmp:
+        png = Path(tmp) / f"{name}.png"
+        render(THESIS / "figures" / f"{name}.pdf", png, width, "png")
+        box = content_box(png)
+        if kind == "svg":
+            w, h = vector(name, box, width, out)
+        else:
+            im = Image.open(png).convert("RGB").crop(box)
+            im.save(out, quality=82)
+            w, h = im.size
     print(f"{out.name}: {w} x {h}, {out.stat().st_size / 1e3:.0f} kB")
 (SITE / "figures" / "thumbs").mkdir(exist_ok=True)
 with tempfile.TemporaryDirectory() as tmp:

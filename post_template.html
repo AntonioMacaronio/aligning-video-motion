@@ -18,7 +18,7 @@
 body { margin: 0; color: var(--ink); background: #fff; font: 17px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 a { color: var(--link); text-decoration: none; }
 a:hover { text-decoration: underline; }
-/* One centred text column; .wide elements (the examples and the figures) span the text column and both side columns. */
+/* One centred text column (the figures sit in it too); .wide elements (the examples) span it and both side columns. */
 main { display: grid; grid-template-columns: [full-start] minmax(20px, 1fr) [wide-start] minmax(0, var(--side)) [text-start] min(var(--text), calc(100% - 40px)) [text-end] minmax(0, var(--side)) [wide-end] minmax(20px, 1fr) [full-end]; }
 main > * { grid-column: text; }
 main > .wide, main > .title, main > .links { grid-column: wide; }
@@ -37,7 +37,6 @@ li { margin: 0 0 8px; }
 .katex-display { margin: 18px 0 22px; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
 figure { margin: 26px 0 30px; }
 figure img { display: block; width: 100%; max-width: 960px; height: auto; margin: 0 auto; }
-figure.narrow img { max-width: var(--text); }  /* as wide as the text column */
 figcaption { font-size: 14.5px; line-height: 1.55; color: var(--muted); max-width: var(--text); margin: 12px auto 0; }
 .table-wrap { overflow-x: auto; margin: 6px 0 4px; }
 table.results { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
@@ -133,8 +132,7 @@ with a motion stream and train it on about 180 hours of paired video and motion 
 generated video and its generated head turn differently and contradict one another. We close part of this inconsistency in two ways, one implicit and one explicit. The former is a curriculum that hides the
 text prompt and gives one modality clean, so that each stream has to read the other. Geometric post-training then scores the
 model's own samples with VGGT-&Omega;, a 3D reconstruction model. We do this by comparing the camera trajectory VGGT-&Omega; extracts from the generated video
-with the generated head pose trajectory. Making this gradient affordable for an 8B-parameter video model with 20k+ tokens and 50 sampling steps is the main engineering problem we
-solve. We copy the reward's gradient onto a single, randomly drawn denoising step, weighted so that the update is an
+with the generated head pose trajectory. We make this gradient affordable for an 8B-parameter video model with 20k+ tokens and 50 sampling steps through several techniques. We copy the reward's gradient onto a single, randomly drawn denoising step, weighted so that the update is an
 unbiased estimate of the full copied gradient, and we compute the reward on a separate sidecar node.</p>
 <p>Compared with joint finetuning alone for the same number of updates, the full recipe lowers the rotation error between
 the generated video's camera and the generated head from 21.5&deg; to 16.7&deg;. It also brings both modalities distributions closer to that of
@@ -162,7 +160,7 @@ both memory and time. In this project, we integrate some techniques to make this
 <p> The tasks differ only in what is given. During
 training the video and the motion get independent noise levels, so at sampling time a given modality is simply held at
 noise level zero while the other is denoised from pure noise.</p>
-<figure class="wide"><img src="figures/arch_tasks.jpg" width="2000" height="1250" loading="lazy" alt="The three tasks as given and generated tokens"></figure>
+<figure><img src="figures/arch_tasks.jpg" width="1915" height="1141" loading="lazy" alt="The three tasks as given and generated tokens"></figure>
 
 <h3>Data</h3>
 <p>We train on NymeriaPlus, an extension of the <a href="https://arxiv.org/abs/2406.09905">Nymeria</a> dataset, in which
@@ -170,24 +168,21 @@ people do everyday activities while wearing <a href="https://arxiv.org/abs/2308.
 inertial motion-capture suit. We use 790 recordings from 196 participants, about 200 hours, and hold out 20 participants entirely, so every
 result on this page is on people the model never saw in training. Each training clip pairs 4.8 seconds of egocentric video with the wearer's 
 full-body motion and a text prompt describing the wearer's actions.</p>
-<figure class="wide"><img src="figures/data_example_kitchen_walk.jpg" width="2000" height="1604" loading="lazy" alt="A training example from NymeriaPlus">
+<figure><img src="figures/data_example_kitchen_walk.jpg" width="2000" height="1581" loading="lazy" alt="A training example from NymeriaPlus">
 <figcaption>A training example from NymeriaPlus, seen from behind the wearer, who opens and closes drawers, turns right and
 walks about 2.2&nbsp;m toward the stove. Top: six of the clip's 49 video frames. Middle: the MHR body every 0.67&nbsp;s,
 colored from green to purple, in a VGGT-&Omega; point cloud of the kitchen; each frame's border matches the body's color at the
 same time. Bottom: the text prompt.</figcaption></figure>
 
 <h3>Architecture</h3>
-<p>We turn HunyuanVideo&nbsp;1.5 into a multimodal diffusion transformer (MM-DiT) with three streams. Motion tokens sit beside
-the video and text tokens. Each stream has its own modulation, projections and feed-forward network, and the three meet in
+<p>We turn HunyuanVideo&nbsp;1.5 into a multimodal diffusion transformer (MM-DiT) with a motion, video, and text stream. Each stream has its own modulation, projections and feed-forward network. They meet in
 one self-attention over the concatenated sequence, with EgoTwin's cross-modal mask deciding which video latents and motion
-frames attend to each other. Only the first 18 of HunyuanVideo's 54 blocks carry motion; the motion then leaves for its own output head,
-while video and text continue through the remaining 36.</p>
-<p>Each motion frame becomes one token of 290 numbers, adapted from <a href="https://arxiv.org/abs/2603.15546">Kimodo</a>'s
-representation: the pose of the glasses' central pupil frame (CPF) as the root, a smoothed head path, and the positions,
-rotations and velocities of 23 body joints, all in a gravity-aligned frame anchored at the first frame's head. There is no
-learned motion autoencoder. Rooting the motion at the head rather than the pelvis means the camera can be read straight out
-of a generated motion, which is what the geometric reward below needs.</p>
-<figure class="wide narrow"><img src="figures/arch_block.png" width="1534" height="1658" loading="lazy" alt="The tri-stream block and the cross-modal mask">
+frames attend to each other.</p>
+<p>Each motion frame becomes one token of 290 numbers using a head-centric adaptation of <a href="https://arxiv.org/abs/2603.15546">Kimodo</a>'s
+representation containing the pose of the glasses' central pupil frame (CPF) as the root, a smoothed head path, and the positions, rotations and velocities of 23 body joints, all in a gravity-aligned frame anchored at the first frame's head.
+There is no learned motion autoencoder. Rooting the motion at the head rather than the pelvis means the camera can be read straight out
+of a generated motion, helping the model avoid learning the complex forward kinematics </p>
+<figure><img src="figures/arch_block.svg" width="614" height="663" loading="lazy" alt="The tri-stream block and the cross-modal mask">
 <figcaption>One tri-stream block; these form the first 18 of HunyuanVideo&nbsp;1.5's 54 blocks. (1) Each stream has its own
 modulation, projections and feed-forward network, and the three meet in a self-attention over the concatenated sequence.
 (2) EgoTwin's cross-modal mask, adapted to a model without a learned motion autoencoder.</figcaption></figure>
@@ -202,7 +197,7 @@ noise levels, so the model sees cleaner video beside noisier motion and the reve
 <li><b>Curriculum learning.</b> The text prompt is withheld and one modality is given clean, to make each stream use the other.</li>
 <li><b>Geometric post-training.</b> A 3D reward aligns the camera of the generated video with the generated head.</li>
 </ol>
-<p>The curriculum targets a shortcut. After joint finetuning, a generated video follows a given motion closely, but a
+<p>The curriculum targets a shortcut we noticed where after joint finetuning, a generated video follows a given motion closely, but a
 generated motion largely ignores a given video. We suspect the text prompt already describes the action well enough to denoise
 the motion without looking at the video. For 5,000 updates, the curriculum replaces the text prompt with an empty one and gives
 one modality clean. It runs 2,000 updates of motion-conditioned video, then a 500-update ramp as the text prompt returns. Then
@@ -243,14 +238,14 @@ differentiable-reward variant of <a href="https://mcallisterdavid.com/fdfo-blog/
 step, as if each step's output reached the final sample unchanged:</p>
 $$G_{\text{copy}} = \sum_{n=0}^{S-1}\Big(\Delta\varphi_n\, J_{v,n}^\top g_z \;-\; \frac{\Delta\sigma_n}{\sigma_n}\, J_{x,n}^\top g_x\Big).$$
 <p>The two sums use the same Jacobians and agree exactly in the last term; they differ only in which gradient each Jacobian
-multiplies. Dropping the chain is more than a saving. A product of 50 step Jacobians can amplify or shrink the gradient and
-make training unstable, while McAllister et al. argue that a copied gradient only needs to point into the same
+multiplies. Dropping the chain has another benefit: a product of 50 step Jacobians can amplify or shrink the gradient and
+make training unstable. For a gradient to be useful, McAllister et al. argue that a copied gradient only needs to point into the same
 half-space as the exact one to keep descending the loss. In FDFO's image-generation ablations, backpropagating through the sampling chain did worse than copying
 the endpoint gradient.</p>
 
 <h3 id="unbiased">One step, drawn at random: an unbiased estimate</h3>
 <p>Copying removes the chain but not the sum. Each term \(J^\top g\) is a backward pass through the model at that step's
-inputs, so \(G_{\text{copy}}\) still costs 50 backward passes. We evaluate one. Before the rollout begins, we draw a single
+inputs, so \(G_{\text{copy}}\) still costs 50 backward passes. We only evaluate one. Before the rollout begins, we draw a single
 step \(n\) with probability \(p_n\). We then run the 50-step rollout without gradients, saving only that step's inputs.
 Finally we re-run the model at step \(n\) with gradients enabled and scale its term by \(1/p_n\):</p>
 $$\hat G = \frac{1}{p_n}\Big(\Delta\varphi_n\, J_{v,n}^\top g_z \;-\; \frac{\Delta\sigma_n}{\sigma_n}\, J_{x,n}^\top g_x\Big).$$
@@ -297,7 +292,7 @@ loss, and backpropagates it to its inputs. It sends back three things: the loss,
 trains on its four ordinary data microbatches. It kept only the inputs of the step it drew (the noisy latent and motion, the
 noise levels, the step size and the random-number state), and the rollout held no activations because it ran without
 gradients. When the gradients arrive, the rank re-runs that step and applies them to its prediction.</p>
-<figure class="wide"><img src="figures/arch_sidecar.png" width="2000" height="1306" loading="lazy" alt="The geometry sidecar">
+<figure><img src="figures/arch_sidecar.svg" width="613" height="405" loading="lazy" alt="The geometry sidecar">
 <figcaption>Top: one training rank and its worker. The worker decodes the finished sample, compares VGGT-&Omega;'s camera
 rotations with those implied by the generated head, and returns the endpoint gradients, which the rank copies onto the
 prediction of the re-run step. Solid arrows carry data, dashed arrows gradients. Bottom: one update, not to scale; the worker
