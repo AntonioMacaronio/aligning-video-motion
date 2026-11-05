@@ -392,6 +392,18 @@ for slot, value in slots.items():
 assert MAIN.count("<!--GALLERY_URL-->") == 1, MAIN.count("<!--GALLERY_URL-->")
 MAIN = MAIN.replace("<!--GALLERY_URL-->", SAMPLES_REL)
 assert not re.search(r"<!--[A-Z_:a-z]+-->", MAIN), "unfilled slot"
+# Animated overlays (make_post_figures.py's OVERLAID) reach data-pad drawing units past their figure on every side;
+# extend each <img class="anim"> past the figure's box by as much, in percent of that box.
+def _place_overlay(m):
+    head = (site / m.group(1)).read_text()[:600]
+    w, h, pad = (float(re.search(rf'{key}="([\d.]+)"', head).group(1)) for key in ("width", "height", "data-pad"))
+    fw, fh = w - 2 * pad, h - 2 * pad
+    style = (f"left: {-100 * pad / fw:.4f}%; top: {-100 * pad / fh:.4f}%; width: {100 * w / fw:.4f}%; "
+             f"height: {100 * h / fh:.4f}%")
+    return f'{m.group(0)} style="{style}"'
+
+
+MAIN = re.sub(r'<img class="anim" src="(figures/[^"]+_anim\.svg)"', _place_overlay, MAIN)
 (site / "index.html").write_text(MAIN)
 
 for page, text in (("samples index.html", s), ("site index.html", MAIN)):

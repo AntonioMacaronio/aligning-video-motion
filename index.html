@@ -37,6 +37,11 @@ li { margin: 0 0 8px; }
 .katex-display { margin: 18px 0 22px; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
 figure { margin: 26px 0 30px; }
 figure img { display: block; width: 100%; max-width: 960px; height: auto; margin: 0 auto; }
+/* A raster figure with an animated SVG overlay in the drawing's coordinates (make_post_figures.py's OVERLAID); readers
+   who ask for reduced motion see the still figure. */
+.overlaid { position: relative; }
+.overlaid img.anim { position: absolute; left: 0; top: 0; width: 100%; height: 100%; max-width: none; }  /* build_site.py extends it past the figure */
+@media (prefers-reduced-motion: reduce) { .overlaid img.anim { display: none; } }
 figcaption { font-size: 14.5px; line-height: 1.55; color: var(--muted); max-width: var(--text); margin: 12px auto 0; }
 .table-wrap { overflow-x: auto; margin: 6px 0 4px; }
 table.results { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
@@ -138,7 +143,7 @@ footer { font-size: 13.5px; color: var(--muted); text-align: center; max-width: 
 <p> The tasks differ only in what is given. During
 training the video and the motion get independent noise levels, so at sampling time a given modality is simply held at
 noise level zero while the other is denoised from pure noise.</p>
-<figure><img src="figures/arch_tasks.jpg" width="1915" height="1141" loading="lazy" alt="The three tasks as given and generated tokens"></figure>
+<figure><div class="overlaid"><img src="figures/arch_tasks.jpg" width="1915" height="1141" loading="lazy" alt="The three tasks as given and generated tokens"><img class="anim" src="figures/arch_tasks_anim.svg" style="left: -0.6527%; top: -1.0955%; width: 101.3055%; height: 102.1911%" alt="" aria-hidden="true" loading="lazy"></div></figure>
 
 <h2 id="overview">Overview</h2>
 <p>When you wear a camera on your head, the video it records is reflective of the way your body moves.

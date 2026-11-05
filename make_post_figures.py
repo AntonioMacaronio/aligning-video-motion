@@ -22,6 +22,7 @@ import Quartz
 from PIL import Image
 
 import sidecar_animation
+import tasks_animation
 
 THESIS, SITE = Path(sys.argv[1]), Path(sys.argv[2])
 # name: (format, pixel width of the render that finds the content box)
@@ -30,6 +31,13 @@ FIGURES = {"arch_tasks": ("jpg", 2000), "data_example_kitchen_walk": ("jpg", 200
 # The line drawings' scripts, in the thesis's figure-src/architecture-20261024 (arguments before the output path)
 VECTOR = {"arch_block": ["make_fig_block.py", "shapes.json"], "arch_sidecar": ["make_fig_sidecar.py"]}
 ANIMATED = {"arch_sidecar": sidecar_animation}   # sidecar_animation.py: one update, looping, over the static drawing
+# A raster figure with an animated overlay (<name>_anim.svg, laid over the JPEG by the page): its drawing's script and
+# inputs, which the overlay takes its frames and bodies from. The inputs are not in git (figure-src ignores JPEG and NPZ);
+# they are backed up at s3://far-research-internal/antzhan/genvideomotion/thesis-site-scenes-20261030/tasks-figure-inputs/.
+OVERLAID = {"arch_tasks": (tasks_animation, ["make_fig_tasks.py", "tasks-inputs/scene", "tasks-inputs/task_poses.npz"])}
+# make_fig_tasks.py renders its bodies with matplotlib; these versions reproduce the thesis figure byte for byte
+FIGURE_PYTHON = ["uv", "run", "--quiet", "--no-project", "--python", "3.11", "--with", "matplotlib==3.11.2",
+                 "--with", "pillow==13.0.0", "--with", "numpy==2.4.6", "python"]
 
 
 def render(pdf, out, width, kind):
@@ -133,6 +141,16 @@ for name, (kind, width) in FIGURES.items():
             im = Image.open(png).convert("RGB").crop(box)
             im.save(out, quality=82)
             w, h = im.size
+        if name in OVERLAID:
+            module, script = OVERLAID[name]
+            source = Path(tmp) / f"{name}.svg"
+            subprocess.run([*FIGURE_PYTHON, *script, str(source)], cwd=THESIS / "figure-src" / "architecture-20261024",
+                           check=True, stdout=subprocess.DEVNULL)
+            scale = 640 / width                                      # drawing units per render pixel (640-unit drawings)
+            view = tuple(round(v * scale, 2) for v in (box[0], box[1], box[2] - box[0], box[3] - box[1]))
+            anim = SITE / "figures" / f"{name}_anim.svg"
+            anim.write_text(module.overlay(source.read_text(), view))
+            print(f"{anim.name}: {anim.stat().st_size / 1e3:.0f} kB")
     print(f"{out.name}: {w} x {h}, {out.stat().st_size / 1e3:.0f} kB")
 (SITE / "figures" / "thumbs").mkdir(exist_ok=True)
 with tempfile.TemporaryDirectory() as tmp:
