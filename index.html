@@ -93,9 +93,10 @@ footer { font-size: 13.5px; color: var(--muted); text-align: center; max-width: 
 
 <nav class="toc" aria-label="Contents"><b>Contents</b>
 <a href="#examples">Thesis figures</a>
+<a href="#model">One model, three tasks</a>
 <a href="#overview">Overview</a>
 <a href="#motivation">Why align video and motion?</a>
-<a href="#model">One model, three tasks</a>
+<a href="#data-architecture">Data and architecture</a>
 <a href="#training">Training in four phases</a>
 <a href="#geometry">Geometric post-training</a>
 <a class="sub" href="#copied-gradient">Copying the gradient</a>
@@ -133,6 +134,12 @@ footer { font-size: 13.5px; color: var(--muted); text-align: center; max-width: 
 </div>
 </section>
 
+<h2 id="model">One model, three tasks</h2>
+<p> The tasks differ only in what is given. During
+training the video and the motion get independent noise levels, so at sampling time a given modality is simply held at
+noise level zero while the other is denoised from pure noise.</p>
+<figure><img src="figures/arch_tasks.jpg" width="1915" height="1141" loading="lazy" alt="The three tasks as given and generated tokens"></figure>
+
 <h2 id="overview">Overview</h2>
 <p>When you wear a camera on your head, the video it records is reflective of the way your body moves.
 For example, the camera pans exactly how your head turns, and your hands appear in the frame when your arms bring them there. We build
@@ -168,12 +175,7 @@ and <a href="https://arxiv.org/abs/2310.03739">AlignProp</a> do for images. Howe
 differentiating through dozens of denoising steps, the video decoder and the estimator, which is prohibitively expensive in
 both memory and time. In this project, we integrate some techniques to make this more tractable.</p>
 
-<h2 id="model">One model, three tasks</h2>
-<p> The tasks differ only in what is given. During
-training the video and the motion get independent noise levels, so at sampling time a given modality is simply held at
-noise level zero while the other is denoised from pure noise.</p>
-<figure><img src="figures/arch_tasks.jpg" width="1915" height="1141" loading="lazy" alt="The three tasks as given and generated tokens"></figure>
-
+<h2 id="data-architecture">Data and architecture</h2>
 <h3>Data</h3>
 <p>We train on NymeriaPlus, an extension of the <a href="https://arxiv.org/abs/2406.09905">Nymeria</a> dataset, in which
 people do everyday activities while wearing <a href="https://arxiv.org/abs/2308.13561">Project Aria</a> glasses and an
