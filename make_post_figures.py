@@ -21,12 +21,15 @@ import numpy as np
 import Quartz
 from PIL import Image
 
+import sidecar_animation
+
 THESIS, SITE = Path(sys.argv[1]), Path(sys.argv[2])
 # name: (format, pixel width of the render that finds the content box)
 FIGURES = {"arch_tasks": ("jpg", 2000), "data_example_kitchen_walk": ("jpg", 2000), "arch_block": ("svg", 1600),
            "arch_sidecar": ("svg", 2000)}
 # The line drawings' scripts, in the thesis's figure-src/architecture-20261024 (arguments before the output path)
 VECTOR = {"arch_block": ["make_fig_block.py", "shapes.json"], "arch_sidecar": ["make_fig_sidecar.py"]}
+ANIMATED = {"arch_sidecar": sidecar_animation}   # sidecar_animation.py: one update, looping, over the static drawing
 
 
 def render(pdf, out, width, kind):
@@ -102,12 +105,19 @@ def vector(name, box, render_width, out):
         subprocess.run([sys.executable, *VECTOR[name], str(raw)], cwd=src, check=True, stdout=subprocess.DEVNULL)
         raw.write_text(SHAPE_OPACITY.sub(r'<\1\2 stroke-opacity="\3" fill-opacity="\3"', raw.read_text()))
         svg = subprocess.run(["rsvg-convert", "-f", "svg", str(raw)], check=True, capture_output=True, text=True).stdout
+        animated = None
+        if name in ANIMATED:   # the page's animation, layered over the drawing in the same coordinates
+            ANIMATED[name].check_layout(raw.read_text())
+            animated = svg[:svg.rindex("</svg>")] + ANIMATED[name].overlay() + "</svg>\n"
     head = re.search(r'<svg [^>]*width="([\d.]+)(?:pt|px)?" height="([\d.]+)(?:pt|px)?" viewBox="0 0 ([\d.]+) ([\d.]+)"', svg)
     scale = float(head.group(3)) / render_width                  # SVG units per render pixel
     x0, y0, x1, y1 = (round(v * scale, 2) for v in box)
     w, h = round(x1 - x0, 2), round(y1 - y0, 2)
-    svg = svg.replace(head.group(0), head.group(0).split(" width=")[0] + f' width="{w}" height="{h}" viewBox="{x0} {y0} {w} {h}"', 1)
-    out.write_text(svg)
+    crop = head.group(0).split(" width=")[0] + f' width="{w}" height="{h}" viewBox="{x0} {y0} {w} {h}"'
+    if animated:   # <name>.svg animates; <name>_static.svg is for readers who ask for reduced motion (a <picture> source)
+        out.write_text(animated.replace(head.group(0), crop, 1))
+        out = out.with_name(f"{name}_static.svg")
+    out.write_text(svg.replace(head.group(0), crop, 1))
     return w, h
 
 

@@ -295,7 +295,7 @@ loss, and backpropagates it to its inputs. It sends back three things: the loss,
 trains on its four ordinary data microbatches. It kept only the inputs of the step it drew (the noisy latent and motion, the
 noise levels, the step size and the random-number state), and the rollout held no activations because it ran without
 gradients. When the gradients arrive, the rank re-runs that step and applies them to its prediction.</p>
-<figure><img src="figures/arch_sidecar.svg" width="613" height="405" loading="lazy" alt="The geometry sidecar">
+<figure><picture><source srcset="figures/arch_sidecar_static.svg" media="(prefers-reduced-motion: reduce)"><img src="figures/arch_sidecar.svg" width="613" height="405" loading="lazy" alt="The geometry sidecar, animated: the rank's rollout, the sample sent to the worker, its forward and backward pass, and the gradients sent back"></picture>
 <figcaption>Top: one training rank and its worker. The worker decodes the finished sample, compares VGGT-&Omega;'s camera
 rotations with those implied by the generated head, and returns the endpoint gradients, which the rank copies onto the
 prediction of the re-run step. Solid arrows carry data, dashed arrows gradients. Bottom: one update, not to scale; the worker
