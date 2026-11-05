@@ -151,8 +151,15 @@ with a motion stream and train it on about 180 hours of paired video and motion 
 generated video and its generated head turn differently and contradict one another. We close part of this inconsistency in two ways, one implicit and one explicit. The former is a curriculum that hides the
 text prompt and gives one modality clean, so that each stream has to read the other. Geometric post-training then scores the
 model's own samples with VGGT-&Omega;, a 3D reconstruction model. We do this by comparing the camera trajectory VGGT-&Omega; extracts from the generated video
-with the generated head pose trajectory. We make this gradient affordable for an 8B-parameter video model with 20k+ tokens and 50 sampling steps through several techniques. We copy the reward's gradient onto a single, randomly drawn denoising step, weighted so that the update is an
-unbiased estimate of the full copied gradient, and we compute the reward on a separate sidecar node.</p>
+with the generated head pose trajectory. Backpropagating this reward through all 50 sampling steps of an 8B-parameter
+model with 20k+ tokens is intractably expensive, so we make three simplifications:</p>
+<ol>
+<li>We skip differentiating through the sampler: the reward's gradient with respect to the final sample is reused as the
+gradient at every denoising step.</li>
+<li>Instead of applying this copied gradient at all 50 steps, we apply it at a single randomly drawn step, reweighted so the
+update is still an unbiased estimate of the full sum.</li>
+<li>We run VGGT-&Omega; and compute the reward on a separate node, so it takes no memory or compute from the training GPUs.</li>
+</ol>
 <p>Compared with joint finetuning alone for the same number of updates, the full recipe lowers the rotation error between
 the generated video's camera and the generated head from 21.5&deg; to 16.7&deg;. It also brings both modalities distributions closer to that of
 real data: the video FID falls from 71.7 to 63.8, and the motion's Fr&eacute;chet distance from 42.6 to 28.2.</p>
@@ -195,7 +202,7 @@ frames attend to each other.</p>
 <p>Each motion frame becomes one token of 290 numbers using a head-centric adaptation of <a href="https://arxiv.org/abs/2603.15546">Kimodo</a>'s
 representation containing the pose of the glasses' central pupil frame (CPF) as the root, a smoothed head path, and the positions, rotations and velocities of 23 body joints, all in a gravity-aligned frame anchored at the first frame's head.
 There is no learned motion autoencoder. Rooting the motion at the head rather than the pelvis means the camera can be read straight out
-of a generated motion, helping the model avoid learning the complex forward kinematics </p>
+of a generated motion, so the model never has to learn the complex pelvis-to-head forward kinematics that link the body to the video.</p>
 <figure><img src="figures/arch_block.svg" width="614" height="663" loading="lazy" alt="The tri-stream block and the cross-modal mask">
 <figcaption>One tri-stream block; these form the first 18 of HunyuanVideo&nbsp;1.5's 54 blocks. (1) Each stream has its own
 modulation, projections and feed-forward network, and the three meet in a self-attention over the concatenated sequence.
