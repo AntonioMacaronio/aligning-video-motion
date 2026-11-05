@@ -19,6 +19,8 @@ THESIS, SITE = Path(sys.argv[1]), Path(sys.argv[2])
 # name: (format, pixel width)
 FIGURES = {"arch_tasks": ("jpg", 2000), "data_example_kitchen_walk": ("jpg", 2000), "arch_block": ("png", 1600),
            "arch_sidecar": ("png", 2000)}
+# Figures shown at the text column's width: their white page margins are trimmed, so the drawing meets the text's edges.
+TRIM = {"arch_block"}
 
 
 def render(pdf, out, width, kind):
@@ -76,6 +78,12 @@ def thumbnail(im, size=176):
 for name, (kind, width) in FIGURES.items():
     out = SITE / "figures" / f"{name}.{kind}"
     w, h = render(THESIS / "figures" / f"{name}.pdf", out, width, kind)
+    if name in TRIM:
+        im = Image.open(out).convert("RGB")
+        ys, xs = np.nonzero(np.asarray(im).min(axis=2) < 245)
+        im = im.crop((int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1))
+        im.save(out)
+        w, h = im.size
     print(f"{out.name}: {w} x {h}, {out.stat().st_size / 1e3:.0f} kB")
 (SITE / "figures" / "thumbs").mkdir(exist_ok=True)
 with tempfile.TemporaryDirectory() as tmp:

@@ -37,7 +37,7 @@ li { margin: 0 0 8px; }
 .katex-display { margin: 18px 0 22px; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
 figure { margin: 26px 0 30px; }
 figure img { display: block; width: 100%; max-width: 960px; height: auto; margin: 0 auto; }
-figure.narrow img { max-width: 620px; }
+figure.narrow img { max-width: var(--text); }  /* as wide as the text column */
 figcaption { font-size: 14.5px; line-height: 1.55; color: var(--muted); max-width: var(--text); margin: 12px auto 0; }
 .table-wrap { overflow-x: auto; margin: 6px 0 4px; }
 table.results { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
@@ -173,10 +173,7 @@ both memory and time. In this project, we integrate some techniques to make this
 <p> The tasks differ only in what is given. During
 training the video and the motion get independent noise levels, so at sampling time a given modality is simply held at
 noise level zero while the other is denoised from pure noise.</p>
-<figure class="wide"><img src="figures/arch_tasks.jpg" width="2000" height="1250" loading="lazy" alt="The three tasks as given and generated tokens">
-<figcaption>The three tasks differ only in their conditioning. Given video latents show the clip's frames, and given motion
-shows its MHR body at the matching time, colored green to purple over time; generated tokens start as noise and are
-denoised. The first frame, the first pose and the text prompt are given in all three.</figcaption></figure>
+<figure class="wide"><img src="figures/arch_tasks.jpg" width="2000" height="1250" loading="lazy" alt="The three tasks as given and generated tokens"></figure>
 
 <h3>Data</h3>
 <p>We train on NymeriaPlus, an extension of the <a href="https://arxiv.org/abs/2406.09905">Nymeria</a> dataset, in which
@@ -201,7 +198,7 @@ representation: the pose of the glasses' central pupil frame (CPF) as the root, 
 rotations and velocities of 23 body joints, all in a gravity-aligned frame anchored at the first frame's head. There is no
 learned motion autoencoder. Rooting the motion at the head rather than the pelvis means the camera can be read straight out
 of a generated motion, which is what the geometric reward below needs.</p>
-<figure class="wide narrow"><img src="figures/arch_block.png" width="1600" height="1698" loading="lazy" alt="The tri-stream block and the cross-modal mask">
+<figure class="wide narrow"><img src="figures/arch_block.png" width="1534" height="1658" loading="lazy" alt="The tri-stream block and the cross-modal mask">
 <figcaption>One tri-stream block; these form the first 18 of HunyuanVideo&nbsp;1.5's 54 blocks. (1) Each stream has its own
 modulation, projections and feed-forward network, and the three meet in a self-attention over the concatenated sequence.
 (2) EgoTwin's cross-modal mask, adapted to a model without a learned motion autoencoder.</figcaption></figure>
