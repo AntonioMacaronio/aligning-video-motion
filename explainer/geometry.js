@@ -224,7 +224,8 @@
     const arcLen = arcs.map(a => a.getTotalLength());
     const oneArc = el('path', { d: arcPath(DRAWN), fill: 'none', stroke: COL.grad, 'stroke-width': 2.4, 'marker-end': 'url(#gx-ah-grad)' });
     const oneLen = oneArc.getTotalLength();
-    const counter = el('text', { x: X0 - CELL_W, y: CELL_Y - 10, 'font-size': 13, fill: COL.grad, 'font-weight': 600 });
+    // above the outermost copied-gradient arc (the one to step 0), which stays below y = 129 under this text
+    const counter = el('text', { x: X0 - CELL_W, y: 112, 'font-size': 13, fill: COL.grad, 'font-weight': 600 });
 
     // ---------- the sample: the video tile over the motion tile ----------
     const gCard = el('g');
