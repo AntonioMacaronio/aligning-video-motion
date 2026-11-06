@@ -41,13 +41,13 @@
     // ---------- the story's lines and their times ----------
     // Each line's choreography is written in its scripted seconds (0 .. data-dur). TRIM then plays stretches of that
     // script faster: [from, to, seconds] plays scripted seconds from..to in that many real seconds. Most are still
-    // stretches (nothing scripted moves, so only the shortening shows); the three in the first part also speed up its
-    // rollout and its video. The continuous motions (the head turning, the wobble, the blinking and the shaking, the
+    // stretches (nothing scripted moves, so only the shortening shows); in the first part they also speed up its
+    // appearance, its first step (1 s), its rollout (4 s) and its video. The continuous motions (the head turning, the wobble, the blinking and the shaking, the
     // walking figure) run on real time, so they keep their speed. Every line still stays up long enough to read.
     const TRIM = {
-        noise: [[3.5, 7, 1.2]],
-        step: [[2.1, 3.5, 0.4], [3.5, 5.5, 1.5], [5.5, 8, 0.9]],
-        steps: [[0, 0.8, 0.4], [0.8, 8.3, 6], [8.3, 10, 0.9]],
+        noise: [[0, 3.5, 1.6], [3.5, 7, 1.9]],
+        step: [[2.1, 3.5, 0.4], [3.5, 5.5, 1], [5.5, 8, 0.9]],
+        steps: [[0, 0.8, 0.4], [0.8, 8.3, 4], [8.3, 10, 0.9]],
         sample: [[0, 0.5, 0.3], [0.5, 5.6, 4.3], [5.6, 7, 0.7]],
         worn: [[5.4, 8, 0.5]],
         drift: [[2.5, 7, 1.3]],
@@ -294,9 +294,10 @@
 
     // Yaw over a sweep of the video's 49 frames (the head's C^k and the video's camera R^k, top-down), illustrative.
     const NK = 49;
-    const PSI_K = Array.from({ length: NK }, (_, k) => 30 * Math.sin(2 * Math.PI * k / 32));
-    const DEL_K = Array.from({ length: NK }, (_, k) => 14 + 9 * Math.sin(2 * Math.PI * k / 19 + 0.8));
+    const psiK = k => 30 * Math.sin(2 * Math.PI * k / 32), delK = k => 14 + 9 * Math.sin(2 * Math.PI * k / 19 + 0.8);
+    const DEL_K = Array.from({ length: NK }, (_, k) => delK(k));
     const MEAN_K = DEL_K.map((_, k) => DEL_K.slice(0, k + 1).reduce((a, b) => a + b, 0) / (k + 1));
+    const meanK = kf => { const i = Math.min(NK - 2, Math.floor(kf)); return lerp(MEAN_K[i], MEAN_K[i + 1], clamp(kf - i)); };
 
     // ---------- the 2D picture of the estimates ----------
     const gPlot = el('g');
@@ -437,11 +438,11 @@
             const d = 26 * smooth(P(t, 'drift', 0.5, 2.5)) + 3 * Math.sin(t * 1.7) * smooth(P(t, 'drift', 0.5, 2.5));
             return { psi, chi: psi + d, k: -1 };
         }
-        const k = Math.round((NK - 1) * P(t, 'score', 2, 8));
+        const kf = (NK - 1) * P(t, 'score', 2, 8), k = Math.round(kf);   // the compass turns smoothly; frames step
         const w = smooth(P(t, 'score', 0.3, 1.8));
         const freePsi = free(at('worn', 1.2)), freeD = 26 + 3 * Math.sin(t * 1.7);
-        const psi = lerp(freePsi, PSI_K[k], w), d = lerp(freeD, DEL_K[k], w);
-        return { psi, chi: psi + d, k: t < at('score', 2) ? -1 : k };
+        const psi = lerp(freePsi, psiK(kf), w), d = lerp(freeD, delK(kf), w);
+        return { psi, chi: psi + d, k: t < at('score', 2) ? -1 : k, kf };
     }
 
     function render(t) {
@@ -464,7 +465,7 @@
         const second = t >= at('nograd', 0.6);
         op(noiseImgs[0], second ? 0 : Math.pow(sig, 0.85));
         op(noiseImgs[1], second ? Math.pow(sig, 0.85) : 0);
-        const { psi, chi, k } = yaw(t);
+        const { psi, chi, k, kf } = yaw(t);
         let frame = 11;
         if (t < at('sample', 0.5) || second) frame = 0;
         else if (on('sample')) frame = Math.min(11, Math.floor((tau - 0.5) / 0.42));
@@ -568,7 +569,7 @@
         place(L.cam, clx, cly, compassO * (1 - P(t, 'vggt', 2.4, 3)), 'camera');
         place(L.rhat, clx, cly, compassO * P(t, 'vggt', 2.6, 3.2), tex(String.raw`\hat R^k`));
         place(L.ck, hlx, hly, compassO * P(t, 'calib', 2.6, 3.2), tex('C^k'));
-        const meanNow = k >= 0 ? MEAN_K[k] : MEAN_K[NK - 1];
+        const meanNow = k >= 0 ? meanK(kf) : MEAN_K[NK - 1];
         const rescore = on('rerun') ? 1 + 0.6 * Math.sin(Math.PI * P(t, 'rerun', 0, 0.8)) : 1;
         place(L.score, CX, CY + CR + 20, compassO * P(t, 'score', 2, 2.6),
             `<span style="display:inline-block;transform:scale(${rescore.toFixed(3)})">${tex(String.raw`\mathcal{L}_{\text{geom}} = ${meanNow.toFixed(1)}^\circ`)}</span>`);
