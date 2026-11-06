@@ -1,5 +1,5 @@
 /* The geometric post-training explainer (#gx, explainer/geometry.js): a bordered card with the current line above the
-   stage, the stage (an SVG, with a layer of KaTeX labels and the line of math laid over it in the same 960 x 540 units; the SVG's
+   stage, the stage (an SVG, with a layer of KaTeX labels and the line of math laid over it in the same 960 x 510 units; the SVG's
    scene and its labels move together with the camera, the line of math stays put),
    and the seek bar with the story's parts under it. */
 .gx { margin: 8px 0 34px; }
@@ -17,17 +17,17 @@
 .gx-ledes { display: grid; }
 .gx-lede { grid-area: 1 / 1; margin: 0; font-size: 16px; line-height: 1.5; color: #374151; opacity: 0; transition: opacity 0.35s; }
 .gx-lede.on { opacity: 1; }
-.gx-stage { position: relative; width: 100%; aspect-ratio: 960 / 540; margin-top: 6px; overflow: hidden; }
+.gx-stage { position: relative; width: 100%; aspect-ratio: 960 / 510; margin-top: 6px; overflow: hidden; }
 .gx-stage > svg { position: absolute; inset: 0; width: 100%; height: 100%; font-family: inherit; }
-.gx-math { position: absolute; left: 0; top: 0; width: 960px; height: 540px; transform-origin: 0 0; pointer-events: none; }
-.gx-scene { position: absolute; left: 0; top: 0; width: 960px; height: 540px; transform-origin: 0 0; }
+.gx-math { position: absolute; left: 0; top: 0; width: 960px; height: 510px; transform-origin: 0 0; pointer-events: none; }
+.gx-scene { position: absolute; left: 0; top: 0; width: 960px; height: 510px; transform-origin: 0 0; }
 .gx-m { position: absolute; white-space: nowrap; line-height: 1; }
 .gx-m .katex { font-size: 1em; }
 .gx-word { font-family: inherit; }
 .gx-chip { background: #fff; border: 1.6px solid #dc2626; border-radius: 7px; padding: 5px 9px 6px; }
 /* The line of math: one row per formula, all in one cell; each formula's pieces shrink or grow (geometry.js), so the
    formula reflows as it turns into the next. */
-.gx-band { position: absolute; left: 0; top: 402px; width: 960px; display: grid; justify-items: center; }
+.gx-band { position: absolute; left: 0; top: 350px; width: 960px; display: grid; justify-items: center; }
 .gx-row { grid-area: 1 / 1; display: flex; flex-direction: column; align-items: center; }
 .gx-eq { display: flex; align-items: center; justify-content: center; font-size: 24px; color: var(--ink); min-height: 80px; }
 .gx-note { font-size: 13.5px; color: #57606a; margin-top: 4px; }

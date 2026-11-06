@@ -19,7 +19,7 @@
     const root = document.getElementById('gx');
     if (!root || !window.katex) return;
     const NS = 'http://www.w3.org/2000/svg';
-    const W = 960, H = 540;
+    const W = 960, H = 510;
     const COL = { video: '#1d4ed8', motion: '#047857', model: '#6d28d9', grad: '#dc2626', ink: '#1f2328',
         muted: '#6b7280', rule: '#cbd5e1', faint: '#e5e7eb', ok: '#15803d' };
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -120,7 +120,9 @@
     const CX = 862, CY = 128, CR = 74;                                           // the compass
     const edgeX = y => CX - Math.sqrt(CR * CR - (y - CY) ** 2) - 3;
     const BASE = 314, BAR_H = 50;                                                // the p_n bars
-    const MEM_X = 96, MEM_Y = 350, BLOCK = 20, CAP = 12;                          // the memory bar holds CAP blocks
+    // The GPU memory: a column at the track's left end, CAP blocks high; past that the blocks pile up off the top.
+    const MEM_X = 38, MEM_W = 28, MEM_B = CELL_Y + CELL_H + 2, PITCH = 15, CAP = 12;
+    const blockY = b => MEM_B - 15 - b * PITCH;
     const ORIGIN = [640, 314], GV = [190, -175];                                  // the 2D picture of the estimates
 
     // ---------- the stage ----------
@@ -159,8 +161,10 @@
     sceneLabels.className = 'gx-scene';
     mathLayer.appendChild(sceneLabels);
     // The shots: each a box of the scene to fill the space above the line of math (y < TOP).
-    const TOP = 400;
-    const SHOTS = { sampler: [14, 14, 650, 262], reward: [520, 18, 958, 252], all: [0, 0, 960, TOP] };
+    const TOP = 342;
+    // sampler: Part 1; reward: Part 2; story: Part 3 and the copied gradient (the track, the reward, the memory),
+    // centred over the line of math; all: from the draw on (the p_n bars and the 2D picture below the track).
+    const SHOTS = { sampler: [14, 14, 650, 262], reward: [520, 18, 958, 252], story: [0, 8, 960, 248], all: [0, 0, 960, TOP] };
     const camera = box => {
         const [x0, y0, x1, y1] = box, s = Math.min(W / (x1 - x0), TOP / (y1 - y0));
         return { s, tx: (W - s * (x1 - x0)) / 2 - s * x0, ty: (TOP - s * (y1 - y0)) / 2 - s * y0 };
@@ -208,13 +212,13 @@
 
     // ---------- the GPU memory bar ----------
     const gMem = el('g');
-    const memFrame = el('rect', { x: MEM_X, y: MEM_Y, width: CAP * BLOCK + 4, height: 24, rx: 5, fill: '#fff', 'stroke-width': 1.6 }, gMem);
-    const memLabel = el('text', { x: MEM_X, y: MEM_Y - 7, 'font-size': 12.5, fill: COL.muted }, gMem);
+    const memFrame = el('rect', { x: MEM_X, y: MEM_B - CAP * PITCH - 4, width: MEM_W, height: CAP * PITCH + 4, rx: 5, fill: '#fff', 'stroke-width': 1.6 }, gMem);
+    const memLabel = el('text', { x: MEM_X + MEM_W / 2, y: MEM_B + 16, 'font-size': 11.5, fill: COL.muted, 'text-anchor': 'middle' }, gMem);
     memLabel.textContent = 'GPU memory';
-    const oomLabel = el('text', { x: MEM_X + CAP * BLOCK + 4, y: MEM_Y - 7, 'font-size': 13, 'font-weight': 700, fill: COL.grad, 'text-anchor': 'end' }, gMem);
+    const oomLabel = el('text', { x: MEM_X + MEM_W + 8, y: MEM_B - CAP * PITCH + 4, 'font-size': 13, 'font-weight': 700, fill: COL.grad }, gMem);
     oomLabel.textContent = 'out of memory!';
-    const blocks = Array.from({ length: NSTEP }, () => el('rect', { width: BLOCK - 3, height: 18, rx: 2.5 }, gMem));
-    const memNote = el('text', { 'font-size': 12, fill: COL.model }, gMem);
+    const blocks = Array.from({ length: NSTEP }, () => el('rect', { x: MEM_X + 3, width: MEM_W - 6, height: PITCH - 3, rx: 2.5 }, gMem));
+    const memNote = el('text', { x: 14, y: MEM_B + 34, 'font-size': 12, fill: COL.model }, gMem);
 
     // ---------- the copied gradient's arcs ----------
     const gArcs = el('g');
@@ -307,7 +311,7 @@
     const hats = Array.from({ length: NUPD }, () => el('line', { x1: ORIGIN[0], y1: ORIGIN[1], stroke: COL.grad, 'stroke-width': 1.6, 'marker-end': 'url(#gx-ah-grad)' }, gPlot));
     const gArrow = el('line', { x1: ORIGIN[0], y1: ORIGIN[1], x2: ORIGIN[0] + GV[0], y2: ORIGIN[1] + GV[1], stroke: COL.ink, 'stroke-width': 3.2, 'marker-end': 'url(#gx-ah-ink)' }, gPlot);
     const meanArrow = el('line', { x1: ORIGIN[0], y1: ORIGIN[1], stroke: COL.model, 'stroke-width': 3.6, 'marker-end': 'url(#gx-ah-model)' }, gPlot);
-    const updText = el('text', { x: ORIGIN[0] - 6, y: ORIGIN[1] + 22, 'font-size': 12.5, fill: COL.muted }, gPlot);
+    const updText = el('text', { x: ORIGIN[0] - 6, y: ORIGIN[1] + 19, 'font-size': 12.5, fill: COL.muted }, gPlot);
     // Each step's term of G_copy, T_n = p_n (G + e_n), with the e_n weighted to mean zero, so sum_n T_n = G exactly and
     // the estimate T_n / p_n = G + e_n; the draws are the one the story makes (step 48) and then a seeded sample of p.
     const E = (() => {
@@ -451,8 +455,8 @@
         const on = id => cur === id, past = id => li > IDX[id];
 
         // ---- the camera: the sampler, then the reward, then everything
-        const toReward = ease(P(t, 'worn', 0, 1.4)), toAll = ease(P(t, 'g', 0, 1.4));
-        const shot = SHOTS.sampler.map((v, i) => lerp(lerp(v, SHOTS.reward[i], toReward), SHOTS.all[i], toAll));
+        const toReward = ease(P(t, 'worn', 0, 1.4)), toStory = ease(P(t, 'g', 0, 1.4)), toAll = ease(P(t, 'draw', 0, 1.4));
+        const shot = SHOTS.sampler.map((v, i) => lerp(lerp(lerp(v, SHOTS.reward[i], toReward), SHOTS.story[i], toStory), SHOTS.all[i], toAll));
         const cam = camera(shot);
         set(scene, { transform: `translate(${cam.tx},${cam.ty}) scale(${cam.s.toFixed(4)})` });
         const camKey = `${cam.tx.toFixed(2)},${cam.ty.toFixed(2)},${cam.s.toFixed(4)}`;
@@ -580,7 +584,7 @@
         place(L.chip, END_X, 36, chipO, tex(String.raw`g = \partial\mathcal{L}_{\text{geom}} / \partial y_S`));
 
         // ---- the GPU memory
-        op(gMem, Math.max(win(t, at('acts', 0.3), at('copy', 0.9), 0.8, 0.6) , win(t, at('nograd', 0.8), Infinity, 0.6)));
+        op(gMem, win(t, at('acts', 0.3), Infinity, 0.8));   // from here on; empty while the copied gradient is shown
         const overflow = on('oom') ? clamp((tau - blockTime(CAP)) / 0.3) : 0;
         const fits = on('nograd') || on('rerun') || on('cancel') || on('converge');
         set(memFrame, { stroke: overflow > 0 ? COL.grad : fits ? COL.ok : '#94a3b8', 'stroke-width': overflow > 0 ? 2.4 : 1.6 });
@@ -588,7 +592,7 @@
         const shake = overflow * 2.2 * Math.sin(t * 47);
         set(gMem, { transform: `translate(${shake},0)` });
         for (let b = 0; b < NSTEP; b++) {
-            let o = 0, bx = MEM_X + 3 + b * BLOCK, byy = MEM_Y + 3, w = BLOCK - 3, color = '#8b5cf6';
+            let o = 0, bx = MEM_X + 3, byy = blockY(b), h = PITCH - 3, color = '#8b5cf6';
             if (on('acts') && b === 0) {
                 const q = P(t, 'acts', 2, 3.4);
                 o = q > 0 ? 1 : 0;
@@ -601,7 +605,7 @@
             } else if (on('copy')) {
                 o = b < NSTEP ? 1 - clamp(tau / 0.8) : 0; if (b >= CAP) color = COL.grad;
             } else if ((on('nograd') && u * NSTEP > DRAWN) || (on('rerun') && tau < 3)) {
-                if (b === 0) { o = 1; w = 4; }
+                if (b === 0) { o = 1; h = 3; byy = blockY(0) + PITCH - 6; }
             } else if (on('rerun') || on('cancel') || on('converge')) {
                 if (b === 0) {
                     const q = on('rerun') ? P(t, 'rerun', 3, 3.6) : 1;
@@ -609,14 +613,14 @@
                 }
             }
             op(blocks[b], o);
-            if (o > 0) set(blocks[b], { x: bx, y: byy, width: w, fill: color, 'fill-opacity': 0.8 });
+            if (o > 0) set(blocks[b], { x: bx, y: byy, height: h, fill: color, 'fill-opacity': 0.8 });
         }
         let note = '', noteO = 0, noteColor = COL.model;
         if (on('acts')) { note = 'one step’s activations'; noteO = P(t, 'acts', 3.4, 4); }
         else if ((on('nograd') && u * NSTEP > DRAWN) || (on('rerun') && tau < 3)) { note = 'only step n’s input'; noteO = 1; }
         else if (on('rerun') || on('cancel') || on('converge')) { note = '✓ one step’s activations: it fits'; noteO = on('rerun') ? P(t, 'rerun', 3.6, 4.2) : 1; noteColor = COL.ok; }
         memNote.textContent = note;
-        set(memNote, { x: MEM_X + (on('acts') || (on('rerun') && tau >= 3) || on('cancel') || on('converge') ? BLOCK + 8 : 12), y: MEM_Y + 16.5, fill: noteColor });
+        set(memNote, { fill: noteColor });
         op(memNote, noteO);
 
         // ---- copying g to every step, and counting the backward passes
@@ -655,9 +659,9 @@
         if (markN !== null) set(marker, { transform: `translate(${cellX(markN)},${BASE + 3})` });
         place(L.pn, cellX(NSTEP - 1) + 16, BASE - BAR_H + 6, barsUp, tex('p_n'), 'l');
         const landed = on('draw') ? P(t, 'draw', 6.6, 7.1) : past('draw') && !on('converge') ? 1 : on('converge') ? 1 - clamp(tau / 0.6) : 0;
-        place(L.drawn, cellX(DRAWN) - 14, BASE + 16, landed, tex(String.raw`n = ${DRAWN},\ p_n = ${PN[DRAWN].toFixed(3)}`), 'r');
+        place(L.drawn, cellX(DRAWN) - 14, BASE - 22, landed, tex(String.raw`n = ${DRAWN},\ p_n = ${PN[DRAWN].toFixed(3)}`), 'r');
         const wq = on('rerun') ? P(t, 'rerun', 4.2, 4.8) : on('cancel') ? 1 : on('converge') ? 1 - clamp(tau / 0.6) : 0;
-        place(L.weight, cellX(DRAWN) - 14, BASE - 36, wq, tex(String.raw`\times\,1/p_n \approx ${(1 / PN[DRAWN]).toFixed(1)}`), 'r');
+        place(L.weight, cellX(DRAWN) - 14, BASE - 44, wq, tex(String.raw`\times\,1/p_n \approx ${(1 / PN[DRAWN]).toFixed(1)}`), 'r');
 
         // ---- many updates average out to G_copy
         const plotO = on('converge') ? P(t, 'converge', 0.8, 1.6) : 0;
