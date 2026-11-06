@@ -113,8 +113,6 @@ footer { font-size: 13.5px; color: var(--muted); text-align: center; max-width: 
 <a href="#data-architecture">Data and architecture</a>
 <a href="#training">Training in four phases</a>
 <a href="#geometry">Geometric post-training</a>
-<a class="sub" href="#copied-gradient">Copying the gradient</a>
-<a class="sub" href="#unbiased">One step, drawn at random</a>
 <a class="sub" href="#sidecar">The geometry sidecar</a>
 <a href="#results">Results</a>
 <a href="#limitations">Limitations and future work</a>
@@ -164,44 +162,32 @@ with a motion stream and train it on about 180 hours of paired video and motion 
 <p>A model trained only to denoise each modality might learn their agreement implicitly, but has noticeable inconsistency. For example, the camera movement of its
 generated video and its generated head turn differently and contradict one another. We close part of this inconsistency in two ways, one implicit and one explicit. The former is a curriculum that hides the
 text prompt and gives one modality clean, so that each stream has to read the other. Geometric post-training then scores the
-model's own samples with VGGT-&Omega;, a 3D reconstruction model. We do this by comparing the camera trajectory VGGT-&Omega; extracts from the generated video
-with the generated head pose trajectory. Backpropagating this reward through all 50 sampling steps of an 8B-parameter
-model with 20k+ tokens is intractably expensive, so we make three simplifications:</p>
-<ol>
-<li>We skip differentiating through the sampler: the reward's gradient with respect to the final sample is reused as the
-gradient at every denoising step.</li>
-<li>Instead of applying this copied gradient at all 50 steps, we apply it at a single randomly drawn step, reweighted so the
-update is still an unbiased estimate of the full sum.</li>
-<li>We run VGGT-&Omega; and compute the reward on a separate node, so it takes no memory or compute from the training GPUs.</li>
-</ol>
+model's own samples with VGGT-&Omega;, a 3D reconstruction model, by comparing the camera trajectory it extracts from the generated
+video with the generated head pose trajectory. Backpropagating this reward through all 50 sampling steps is intractably
+expensive, so we copy the reward's gradient onto a single randomly drawn step, and compute the reward on a separate node.</p>
 <p>Compared with joint finetuning alone for the same number of updates, the full recipe lowers the rotation error between
 the generated video's camera and the generated head from 21.5&deg; to 16.7&deg;. It also brings both modalities' distributions closer to that of
 real data: the video FID falls from 71.7 to 63.8, and the motion's Fr&eacute;chet distance from 42.6 to 28.2.</p>
 
 <h2 id="motivation">Why align video and motion?</h2>
-<p>Modern diffusion transformers generate multiple modalities at once.
-<a href="https://arxiv.org/abs/2403.03206">Stable Diffusion&nbsp;3</a> lets text and image tokens attend to each other
-throughout denoising, <a href="https://arxiv.org/abs/2602.15922">DreamZero</a> extends a video model to predict video and
-robot actions together, and <a href="https://arxiv.org/abs/2508.13013">EgoTwin</a> generates egocentric video and human
-motion jointly. In each case the modality streams learn to agree only through data. Each modality is trained to denoise toward
-its own target, but nothing in the objective directly penalizes a video and a motion that describe different events.</p>
-<p>In egocentric video, such disagreement is the most visible: the camera is mounted on the wearer's glasses, so
-the camera trajectory implied by the video should match the head pose's motion. We recover the camera's rotation from a
-video with VGGT-&Omega; and compare it with the head's, both relative to the first frame. On the ground truth recorded video and recorded
-motion the two differ by only about 4&deg, a slight inconsistency. However, when a pretrained video model is adapted to
-joint generation through existing methods of finetuning, the camera of its generated video and its generated head differ by 22&deg on average.</p>
-<p>One direct fix is to optimize this agreement directly. We can treat the frozen estimator as a differentiable reward and
-backpropagate through the sampler, as reward-finetuning methods such as <a href="https://arxiv.org/abs/2309.17400">DRaFT</a>
-and <a href="https://arxiv.org/abs/2310.03739">AlignProp</a> do for images. However, this is a problem for an 8B-parameter video model because it means
-differentiating through dozens of denoising steps, the video decoder and the estimator, which is prohibitively expensive in
-both memory and time. In this project, we integrate some techniques to make this more tractable.</p>
+<p>Modern diffusion transformers such as <a href="https://arxiv.org/abs/2403.03206">Stable Diffusion&nbsp;3</a>,
+<a href="https://arxiv.org/abs/2602.15922">DreamZero</a> and <a href="https://arxiv.org/abs/2508.13013">EgoTwin</a> generate
+several modalities at once, but their streams learn to agree only through data: nothing in the objective directly penalizes
+a video and a motion that describe different events.</p>
+<p>In egocentric video, such disagreement is the most visible, because the camera is mounted on the wearer's glasses. On the
+recorded video and motion, the camera rotation VGGT-&Omega; recovers and the head's rotation differ by only about 4&deg;. When a
+pretrained video model is finetuned for joint generation, they differ by 22&deg; on average.</p>
+<p>The direct fix is to treat the frozen estimator as a differentiable reward and backpropagate through the sampler, as
+<a href="https://arxiv.org/abs/2309.17400">DRaFT</a> and <a href="https://arxiv.org/abs/2310.03739">AlignProp</a> do for
+images. For an 8B-parameter video model, that means differentiating through dozens of denoising steps, the video decoder and
+the estimator, which is prohibitively expensive in both memory and time.</p>
 
 <h2 id="data-architecture">Data and architecture</h2>
 <h3>Data</h3>
 <p>We train on NymeriaPlus, an extension of the <a href="https://arxiv.org/abs/2406.09905">Nymeria</a> dataset, in which
 people do everyday activities while wearing <a href="https://arxiv.org/abs/2308.13561">Project Aria</a> glasses and an
-inertial motion-capture suit. We use 790 recordings from 196 participants, about 200 hours, and hold out 20 participants entirely, so every
-result on this page is on people the model never saw in training. Each training clip pairs 4.8 seconds of egocentric video with the wearer's 
+inertial motion-capture suit. We use 790 recordings from 196 participants, about 200 hours, and hold out 20 participants entirely (about 180 hours remain
+for training), so every result on this page is on people the model never saw in training. Each training clip pairs 4.8 seconds of egocentric video with the wearer's 
 full-body motion and a text prompt describing the wearer's actions.</p>
 <figure><img src="figures/data_example_kitchen_walk.jpg" width="2000" height="1581" loading="lazy" alt="A training example from NymeriaPlus">
 <figcaption>A training example from NymeriaPlus, seen from behind the wearer, who opens and closes drawers, turns right and
@@ -213,10 +199,10 @@ same time. Bottom: the text prompt.</figcaption></figure>
 <p>We turn HunyuanVideo&nbsp;1.5 into a multimodal diffusion transformer (MM-DiT) with a motion, video, and text stream. Each stream has its own modulation, projections and feed-forward network. They meet in
 one self-attention over the concatenated sequence, with EgoTwin's cross-modal mask deciding which video latents and motion
 frames attend to each other.</p>
-<p>Each motion frame becomes one token of 290 numbers using a head-centric adaptation of <a href="https://arxiv.org/abs/2603.15546">Kimodo</a>'s
-representation containing the pose of the glasses' central pupil frame (CPF) as the root, a smoothed head path, and the positions, rotations and velocities of 23 body joints, all in a gravity-aligned frame anchored at the first frame's head.
-There is no learned motion autoencoder. Rooting the motion at the head rather than the pelvis means the camera can be read straight out
-of a generated motion, so the model never has to learn the complex pelvis-to-head forward kinematics that link the body to the video.</p>
+<p>Each motion frame is one token, a head-centric adaptation of <a href="https://arxiv.org/abs/2603.15546">Kimodo</a>'s
+representation: the pose of the glasses' central pupil frame (CPF) as the root, a smoothed head path, and 23 body joints.
+Rooting the motion at the head rather than the pelvis means the camera can be read straight out of a generated motion, so the
+model never has to learn the pelvis-to-head kinematics that link the body to the video.</p>
 <figure><img src="figures/arch_block.svg" width="614" height="663" loading="lazy" alt="The tri-stream block and the cross-modal mask">
 <figcaption>One tri-stream block; these form the first 18 of HunyuanVideo&nbsp;1.5's 54 blocks. (1) Each stream has its own
 modulation, projections and feed-forward network, and the three meet in a self-attention over the concatenated sequence.
@@ -232,12 +218,10 @@ noise levels, so the model sees cleaner video beside noisier motion and the reve
 <li><b>Curriculum learning.</b> The text prompt is withheld and one modality is given clean, to make each stream use the other.</li>
 <li><b>Geometric post-training.</b> A 3D reward aligns the camera of the generated video with the generated head.</li>
 </ol>
-<p>The curriculum targets a shortcut we noticed where after joint finetuning, a generated video follows a given motion closely, but a
-generated motion largely ignores a given video. We suspect the text prompt already describes the action well enough to denoise
-the motion without looking at the video. For 5,000 updates, the curriculum replaces the text prompt with an empty one and gives
-one modality clean. It runs 2,000 updates of motion-conditioned video, then a 500-update ramp as the text prompt returns. Then
-come 2,000 updates in which half of the clips are given their video, so the motion trains as video-conditioned generation,
-while the other half denoise both modalities without a text prompt. A final 500-update ramp brings the text prompt back.</p>
+<p>The curriculum targets a shortcut we noticed: after joint finetuning, a generated video follows a given motion closely,
+but a generated motion largely ignores a given video, probably because the text prompt already describes the action well
+enough. For 5,000 updates, the curriculum replaces the prompt with an empty one and gives one modality clean, first the motion
+and then the video, each followed by a ramp that brings the prompt back.</p>
 
 <h2 id="geometry">Geometric post-training</h2>
 <!-- The method as one story, played live (explainer/geometry.js; its lines, their ids and lengths in seconds are here). -->
@@ -327,89 +311,26 @@ while the other half denoise both modalities without a text prompt. A final 500-
 </div>
 </div>
 </section>
-<p>The most visible sign of alignment is whether the head turns the way the camera pans, so for the last 2,500 updates we
-score the model's own samples on exactly that. Each training GPU generates a joint sample with the full 50-step sampler,
-decodes its video latent into 49 frames, and runs VGGT-&Omega; on them to recover the camera's rotation \(\hat R^k\) at every
-frame \(k\). From the generated motion we take the head's rotation at the same moments and turn it into a camera rotation
-with the headset's factory calibration, \(C^k = R^{3k}_{\text{world},\text{cpf}}\,R_{\text{cpf},\text{cam}}\). We express
-both trajectories relative to their first frame, \(\tilde R^k = (\hat R^0)^\top \hat R^k\) and
-\(\tilde C^k = (C^0)^\top C^k\), and the loss is the mean angle between them:</p>
-$$\mathcal{L}_{\text{geom}} = \frac{1}{N+1}\sum_{k=0}^{N} \angle\big((\tilde R^k)^\top \tilde C^k\big), \qquad \angle(R) = \arccos\frac{\operatorname{tr} R - 1}{2}.$$
-<p>We use only rotations because VGGT-&Omega;'s translations come in an arbitrary scale. The joint-finetuning loss on real
-data stays on throughout, and the geometric loss is added with weight \(\lambda_{\text{geom}} = 0.005\). The main difficulty
-is computing the gradient within a budgeted memory constraint.</p>
-
-<h3 id="copied-gradient">Copying the gradient through diffusion time</h3>
-<p>The first reduction in memory is to reduce the number of gradients needed to compute through the sampling chain. We do this by copying the gradient from the endpoint to every step. The sampler takes \(S = 50\) Euler steps. At step \(n\), the model looks at the noisy video latent \(z_n\) and the noisy
-motion \(x_n\), and it predicts a video velocity \(\hat v_n\) and a clean motion \(\hat x_n\). Each modality then steps along
-its own noise schedule, \(\varphi\) for the video and \(\sigma\) for the motion:</p>
-$$z_{n+1} = z_n + \Delta\varphi_n\,\hat v_n, \qquad x_{n+1} = x_n + \Delta\sigma_n\,\frac{x_n - \hat x_n}{\sigma_n}.$$
-<p>The motion head predicts clean motion, so its velocity is \((x_n - \hat x_n)/\sigma_n\). Backpropagating the loss through
-the frozen VGGT-&Omega; and the frozen decoder gives its gradient with respect to the finished sample, which we call the
-endpoint gradients:</p>
-$$g_z = \frac{\partial \mathcal{L}_{\text{geom}}}{\partial z_S}, \qquad g_x = \frac{\partial \mathcal{L}_{\text{geom}}}{\partial x_S}.$$
-<p>The gradient we actually want is with respect to the weights \(\theta\). It has one term per sampling step. Each term
-multiplies the model's Jacobian at that step, \(J_{v,n} = \partial\hat v_n/\partial\theta\) and
-\(J_{x,n} = \partial\hat x_n/\partial\theta\), by the gradient of the loss with respect to the state the step produced:</p>
-$$G_{\text{exact}} = \sum_{n=0}^{S-1}\Big(\Delta\varphi_n\, J_{v,n}^\top \frac{\partial\mathcal{L}_{\text{geom}}}{\partial z_{n+1}} \;-\; \frac{\Delta\sigma_n}{\sigma_n}\, J_{x,n}^\top \frac{\partial\mathcal{L}_{\text{geom}}}{\partial x_{n+1}}\Big).$$
-<p>Only the last term uses the endpoint gradients we already have. Every earlier state gradient has to be carried back from
-the finished sample through all the later steps. That means keeping or recomputing the activations of up to 50 forward
-passes of an 8B-parameter model over a 20,800-token video, and multiplying their Jacobians together. Following the
-differentiable-reward variant of <a href="https://mcallisterdavid.com/fdfo-blog/">FDFO</a>
-(<a href="https://arxiv.org/abs/2603.12893">McAllister et al.</a>), we skip that chain. We copy the endpoint gradients to every
-step, as if each step's output reached the final sample unchanged:</p>
-$$G_{\text{copy}} = \sum_{n=0}^{S-1}\Big(\Delta\varphi_n\, J_{v,n}^\top g_z \;-\; \frac{\Delta\sigma_n}{\sigma_n}\, J_{x,n}^\top g_x\Big).$$
-<p>The two sums use the same Jacobians and agree exactly in the last term; they differ only in which gradient each Jacobian
-multiplies. Dropping the chain has another benefit: a product of 50 step Jacobians can amplify or shrink the gradient and
-make training unstable. For a gradient to be useful, McAllister et al. argue that a copied gradient only needs to point into the same
-half-space as the exact one to keep descending the loss. In FDFO's image-generation ablations, backpropagating through the sampling chain did worse than copying
-the endpoint gradient.</p>
-
-<h3 id="unbiased">One step, drawn at random: an unbiased estimate</h3>
-<p>Copying removes the chain but not the sum. Each term \(J^\top g\) is a backward pass through the model at that step's
-inputs, so \(G_{\text{copy}}\) still costs 50 backward passes. We only evaluate one. Before the rollout begins, we draw a single
-step \(n\) with probability \(p_n\). We then run the 50-step rollout without gradients, saving only that step's inputs.
-Finally we re-run the model at step \(n\) with gradients enabled and scale its term by \(1/p_n\):</p>
-$$\hat G = \frac{1}{p_n}\Big(\Delta\varphi_n\, J_{v,n}^\top g_z \;-\; \frac{\Delta\sigma_n}{\sigma_n}\, J_{x,n}^\top g_x\Big).$$
-<p>This is an importance-sampled estimate of the sum, and it is unbiased for any distribution that gives every step a nonzero
-probability. Writing \(T_n\) for step \(n\)'s term of \(G_{\text{copy}}\), the factor \(1/p_n\) cancels the chance of drawing
-that step:</p>
-$$\mathbb{E}_{n\sim p}\big[\hat G\big] \;=\; \sum_{n=0}^{S-1} p_n \cdot \frac{T_n}{p_n} \;=\; \sum_{n=0}^{S-1} T_n \;=\; G_{\text{copy}}.$$
-<p>Drawing the step before the rollout costs nothing in correctness, because the draw is independent of the rollout's noise.
-Knowing it in advance is what lets the rollout keep one step's inputs instead of fifty.</p>
-<p>The distribution only changes the variance. We use \(p_n \propto |\Delta\sigma_n|/\sigma_n\), the size of the motion
-term's own coefficient. With this choice, the motion term's weight after reweighting,
-\((|\Delta\sigma_n|/\sigma_n)/p_n = \sum_m |\Delta\sigma_m|/\sigma_m \approx 3.9\), is the same whichever step is drawn. Every
-update therefore pushes the motion equally hard, and only the video term's weight varies, between 0.37 and 1.7 on our
-schedule. Because \(|\Delta\sigma_n|/\sigma_n\) is the fraction of the remaining noise that step \(n\) removes, the draw
-favors the late, nearly clean steps: the last step is drawn a quarter of the time, and the last ten steps two thirds of the
-time. In code, the whole update is one extra backward pass of a scalar, with the endpoint gradients held constant:</p>
-$$\hat G = \nabla_\theta\,\frac{1}{p_n}\Big(\Delta\varphi_n\,\langle g_z, \hat v_n\rangle \;-\; \frac{\Delta\sigma_n}{\sigma_n}\,\langle g_x, \hat x_n\rangle\Big).$$
-<p>This sits between two earlier designs. <a href="https://arxiv.org/abs/2304.05977">ReFL</a> also supervises a single random
-step, but it stops sampling there and scores that step's one-step prediction of the clean sample. We finish the sample,
-score the real output, and reweight the step by \(1/p_n\) so that the expectation is the full copied gradient. FDFO trains on
-every step of a rollout, but one rollout of our video is costly enough that we can afford only one rollout, and one re-run
-step, per GPU per update.</p>
+<p>For the last 2,500 updates, every training GPU scores the model's own joint sample this way, on top of the
+joint-finetuning loss on real data (weight \(\lambda_{\text{geom}} = 0.005\)). Both camera trajectories are taken relative to
+their first frame, and only rotations are compared, because VGGT-&Omega;'s translations come in an arbitrary scale. Copying the
+gradient follows the differentiable-reward variant of <a href="https://mcallisterdavid.com/fdfo-blog/">FDFO</a>
+(<a href="https://arxiv.org/abs/2603.12893">McAllister et al.</a>), whose image-generation ablations found it better than
+backpropagating through the sampling chain. <a href="https://arxiv.org/abs/2304.05977">ReFL</a> also supervises a single random
+step, but stops sampling there and scores that step's one-step prediction of the clean sample; we finish the sample, score the
+real output, and reweight the step by \(1/p_n\). We draw with \(p_n \propto |\Delta\sigma_n|/\sigma_n\), which gives the motion
+term the same weight whichever step is drawn.</p>
 
 <h3 id="sidecar">The geometry sidecar</h3>
-<p>The copied gradient makes the generator's side cheap: one gradient-free rollout and one re-run step. The reward is still
-heavy. To return \(g_z\), we have to backpropagate through the VAE decoder on 49 frames and the one-billion-parameter
-VGGT-&Omega; on every frame, and their activations are comparable in size to the MM-DiT's own. Freezing these models removes
-their parameter gradients and optimizer state but not their activations. Fully sharded data parallelism (FSDP) doesn't help
-either, because it shards parameters, gradients and optimizer state, not per-sample activations. So we move the reward to a
-second node.</p>
-<p>The training node trains the MM-DiT with FSDP across eight GPUs. The second node, the geometry sidecar, runs eight
-independent workers, one per GPU, each holding the decoder and VGGT-&Omega;. Each training rank gets a worker of its own
-because FSDP keeps the ranks in lockstep: they exchange weight shards before and after every layer, so if two ranks shared a
-worker, the one served second would stall the whole node.</p>
-<p>The copied gradient also keeps the traffic between the nodes small. After its rollout, a rank sends its worker only the
-finished sample \((z_S, x_S)\), detached from any graph, and the serial number of the headset that recorded the clip. The
-worker treats the two tensors as fresh inputs that require gradients. It decodes the video, runs VGGT-&Omega; with activation
-checkpointing over the 49 frames, turns the generated head into a camera with that headset's calibration, evaluates the
-loss, and backpropagates it to its inputs. It sends back three things: the loss, \(g_z\) and \(g_x\). Meanwhile, the rank
-trains on its four ordinary data microbatches. It kept only the inputs of the step it drew (the noisy latent and motion, the
-noise levels, the step size and the random-number state), and the rollout held no activations because it ran without
-gradients. When the gradients arrive, the rank re-runs that step and applies them to its prediction.</p>
+<p>The copied gradient makes the generator's side cheap, but the reward is still heavy. To return the endpoint gradients
+\(g_z\) and \(g_x\) (the video and motion parts of \(g\)), we backpropagate through the VAE decoder on 49 frames and the
+one-billion-parameter VGGT-&Omega;, whose activations are comparable in size to the MM-DiT's own. Freezing these models doesn't
+remove their activations, and fully sharded data parallelism (FSDP) shards parameters, gradients and optimizer state, not
+per-sample activations. So we move the reward to a second node.</p>
+<p>That node, the geometry sidecar, runs one worker per training GPU, because FSDP keeps the ranks in lockstep and a shared
+worker would stall the whole training node. After its rollout, a rank sends its worker only the finished sample
+\((z_S, x_S)\). The worker returns the loss, \(g_z\) and \(g_x\) while the rank trains on its four data microbatches, and the
+rank then re-runs its drawn step and applies them.</p>
 <figure><picture><source srcset="figures/arch_sidecar_static.svg" media="(prefers-reduced-motion: reduce)"><img src="figures/arch_sidecar.svg" width="613" height="405" loading="lazy" alt="The geometry sidecar, animated: the rank's rollout, the sample sent to the worker, its forward and backward pass, and the gradients sent back"></picture>
 <figcaption>Top: one training rank and its worker. The worker decodes the finished sample, compares VGGT-&Omega;'s camera
 rotations with those implied by the generated head, and returns the endpoint gradients, which the rank copies onto the
@@ -433,19 +354,14 @@ participants, drawing one sample per clip and task with the clip's fixed seed.</
 <tr><td></td><td>&#10003;</td><td><span class="u">18.6</span></td><td><b>27.6</b></td><td><b>14.1</b></td></tr>
 <tr><td>&#10003;</td><td>&#10003;</td><td><b>16.7</b></td><td><span class="u">29.6</span></td><td><b>14.1</b></td></tr>
 </tbody></table></div>
-<p class="table-caption">Rotation error in degrees, relative to the first frame (lower is better): the joint video's camera
-against the joint head (self-consistency); the generated head against the recorded head, given the recorded video
-(video-conditioned); and the generated video's camera against the recorded head, given the recorded motion
-(motion-conditioned). VGGT-&Omega;'s camera from the recorded video lies 3.8&deg; from the recorded head, the lowest error the
-camera-based columns can reach. Best in bold, second best underlined.</p>
+<p class="table-caption">Rotation error in degrees, relative to the first frame (lower is better). Self-consistency: the
+joint video's camera against the joint head. Video-conditioned: the generated head against the recorded head. Motion-conditioned:
+the generated video's camera against the recorded head. VGGT-&Omega;'s camera from the recorded video lies 3.8&deg; from the
+recorded head, the lowest error the camera-based columns can reach. Best in bold, second best underlined.</p>
 <p>The final model is the most self-consistent: the camera of its generated video and its generated head differ by
-16.7&deg;, against 21.5&deg; after joint finetuning alone, and each phase helps on its own. Given recorded motion, the
-generated video's camera also follows the recorded head more closely (15.8&deg; to 14.1&deg;). Given recorded video, the
-generated head barely changes (29.7&deg; to 29.6&deg;).</p>
-<p>The two conditioned columns also show how much each stream relies on the other, which we measure as how well a generated
-stream agrees with the modality it was given. A generated video relies strongly on a given motion: its camera lies 14&ndash;16&deg;
-from the recorded head in every model. A generated motion relies on a given video much less: its head stays about
-28&ndash;31&deg; from the recorded head in every model.</p>
+16.7&deg;, against 21.5&deg; after joint finetuning alone, and each phase helps on its own. A generated video follows a given
+motion closely (its camera lies 14&ndash;16&deg; from the recorded head in every model), but a generated motion barely follows
+a given video (28&ndash;31&deg;).</p>
 
 <h3>Video and motion quality</h3>
 <div class="table-wrap"><table class="results">
@@ -457,15 +373,12 @@ from the recorded head in every model. A generated motion relies on a given vide
 <tr><td></td><td>&#10003;</td><td><b>63.4</b></td><td><span class="u">57.7</span></td><td><b>23.8</b></td><td><span class="u">21.3</span></td><td><span class="u">0.42</span></td><td><span class="u">0.38</span></td></tr>
 <tr><td>&#10003;</td><td>&#10003;</td><td>63.8</td><td><b>55.6</b></td><td><span class="u">28.2</span></td><td><b>21.0</b></td><td><b>0.37</b></td><td><b>0.37</b></td></tr>
 </tbody></table></div>
-<p class="table-caption">Fr&eacute;chet distances to the same clips' recordings (lower is better). Video FID uses Inception-v3
-features of the 48 generated frames after the given first frame. Motion FD is computed directly on the standardized
-290-dimensional motion features of the 144 generated frames (pose) and of their frame-to-frame differences (velocity), with
-no learned motion encoder. Motion-conditioned video uses the recorded motion, so it has no generated motion to score.</p>
-<p>Both alignment phases bring the generated video closer to real video. In joint generation, the curriculum and geometric
-post-training each lower the video FID by about 8 points, from 71.7 to 63.4&ndash;63.8, and the final model has the lowest FID
-for motion-conditioned video, 55.6. Geometric post-training has the largest effect on the motion. On its own it cuts the
-pose Fr&eacute;chet distance in joint generation from 42.6 to 23.8, and the final model has the lowest velocity
-Fr&eacute;chet distance in both tasks.</p>
+<p class="table-caption">Fr&eacute;chet distances to the same clips' recordings (lower is better): video FID on Inception-v3
+features of the 48 generated frames; motion FD on the 290-dimensional motion features (pose) and their frame-to-frame
+differences (velocity). Motion-conditioned video has no generated motion to score.</p>
+<p>The curriculum and geometric post-training each lower the joint video FID by about 8 points, from 71.7 to
+63.4&ndash;63.8. Geometric post-training has the largest effect on the motion: on its own it cuts the joint pose Fr&eacute;chet
+distance from 42.6 to 23.8, and the final model has the lowest velocity Fr&eacute;chet distance in both tasks.</p>
 
 <h3>Hands</h3>
 <div class="table-wrap"><table class="results">
@@ -481,22 +394,17 @@ Fr&eacute;chet distance in both tasks.</p>
 Motion-conditioned video: a generated video with the recorded motion. Video-conditioned motion: the recorded video with a
 generated motion.</p>
 <p><a href="https://arxiv.org/abs/2508.13013">HandScore</a>, from EgoTwin, asks whether the video and the motion agree on the
-wearer's hands. A vision-language model (Qwen3-VL-32B) reports whether each hand is visible in every fourth frame, and the
-motion's hands are projected through the headset's calibrated camera to decide whether they should be; the score is the
-F-score averaged over both hands. Hand detection on egocentric video is hard even for this model. Recorded pairs score only
-0.83, mostly because it misses the black gloves of the motion-capture suit, and pairing a video with another clip's motion
-scores about 0.43. The curriculum lifts the joint HandScore from 0.65 to 0.73.</p>
+wearer's hands: a vision-language model (Qwen3-VL-32B) reports whether each hand is visible, and the motion's hands are
+projected through the headset's camera to decide whether they should be. Recorded pairs score 0.83 and mismatched pairs about
+0.43. The curriculum lifts the joint HandScore from 0.65 to 0.73.</p>
 
 <h2 id="limitations">Limitations and future work</h2>
 <p>The alignment gains are modest, and the motion still makes little use of the video when it is given. The geometric
-objective supervises only rotations, because VGGT-&Omega;'s translations have no metric scale, so it shapes how the head turns
-but not where it travels. Post-training is slow, because every update needs a 50-step rollout. And the training motion comes
-from NymeriaPlus's MHR fit of inertial motion capture, whose head pose does not follow the Aria glasses exactly.</p>
-<p>The motion's weak use of the video points to training objectives that make it need the video, or to guidance on the given
-video at sampling time, separate from the text guidance. A translation-aware objective with metric scale, a training set
-built from head-corrected motion, and a learned motion evaluator would each make the alignment and its measurement more
-complete. Longer, autoregressive generation would bring the model closer to its intended use: predicting what a person will
-see and do next.</p>
+objective supervises only rotations, so it shapes how the head turns but not where it travels, and every post-training update
+needs a full 50-step rollout. The training motion also comes from NymeriaPlus's MHR fit of inertial motion capture, whose
+head pose does not follow the Aria glasses exactly. Natural next steps are objectives or sampling-time guidance that make the
+motion use the video, a translation-aware reward with metric scale, and longer, autoregressive generation that predicts what
+a person will see and do next.</p>
 
 <h2 id="citation">Citation</h2>
 <pre>@mastersthesis{zhang2026aligning,
