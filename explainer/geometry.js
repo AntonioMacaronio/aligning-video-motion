@@ -186,10 +186,10 @@
         if (d._show !== show) { d.style.display = show ? '' : 'none'; d._show = show; }
         if (!show) return;
         if (html !== undefined && d._html !== html) { d.innerHTML = html; d._html = html; }
-        const key = `${x.toFixed(1)},${y.toFixed(1)},${anchor}`;
-        if (d._key !== key) {
-            const tx = anchor === 'l' ? '0' : anchor === 'r' ? '-100%' : '-50%';
-            d.style.left = `${x}px`; d.style.top = `${y}px`; d.style.transform = `translate(${tx}, -50%)`; d._key = key;
+        const key = `${x.toFixed(2)},${y.toFixed(2)},${anchor}`;
+        if (d._key !== key) { // one transform, so a moving label glides at sub-pixel steps with what it labels
+            const tx = anchor === 'l' ? '0%' : anchor === 'r' ? '-100%' : '-50%';
+            d.style.transform = `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) translate(${tx}, -50%)`; d._key = key;
         }
         const o2 = clamp(o).toFixed(3);
         if (d._o !== o2) { d.style.opacity = o2; d._o = o2; }
@@ -491,8 +491,7 @@
         const modelO = Math.max(win(t, at('step', 0.3), at('worn', 0.6), 0.8), on('nograd') ? win(t, at('nograd', 0.6), at('nograd', 8.2), 0.5) : 0);
         op(gModel, modelO);
         set(gModel, { transform: `translate(${x},0)` });
-        const beat = rolling ? 1 - ((u * NSTEP) % 1) : 0;
-        set(modelBox, { fill: hexA(COL.model, 0.08 + (second ? 0.08 : 0.3) * beat) });
+        set(modelBox, { fill: hexA(COL.model, rolling ? (second ? 0.12 : 0.2) : 0.08) });   // tinted while it runs
         place(L.model, x, 37, modelO, tex(String.raw`f_\theta`));
         const n = Math.min(NSTEP, Math.floor(u * NSTEP + 1e-6));
         const stateTex = u >= 0.999 ? 'y_S' : `y_{${n}}`;
@@ -729,14 +728,24 @@
             const fill = document.createElement('i'); s.appendChild(fill);
             chap.appendChild(s); segs[i] = { s, fill }; dur += LINES[i].dur;
         }
-        chap.style.flexGrow = dur;
+        chap.style.flexGrow = dur; chap._dur = dur;
         partBtns[pi].style.flexGrow = dur;
         track.appendChild(chap);
     });
     track.appendChild(knob);
+    const chaps = [...track.querySelectorAll('.gx-chap')];
+    const sizeParts = () => { // each chapter starts from its name's width, then grows by its length
+        partBtns.forEach((b, i) => {
+            b.style.flex = 'none'; const w = Math.ceil(b.scrollWidth) + 6;
+            for (const e of [b, chaps[i]]) e.style.flex = `${chaps[i]._dur} 1 ${w}px`;
+        });
+        dirty = true;
+    };
     const playBtn = root.querySelector('.gx-play');
 
     let t = 0, playing = !reduceMotion, stopAt = null, visible = false, last = null, dirty = true, dragging = false;
+    sizeParts();
+    document.fonts?.ready.then(sizeParts);
     const param = new URLSearchParams(location.search).get('gx');
     if (param !== null) { t = clamp(+param, 0, TOTAL - 1e-3); playing = false; }
     else if (reduceMotion) t = LINES[0].t1 - 1e-3;

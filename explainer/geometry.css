@@ -21,7 +21,7 @@
 .gx-stage > svg { position: absolute; inset: 0; width: 100%; height: 100%; font-family: inherit; }
 .gx-math { position: absolute; left: 0; top: 0; width: 960px; height: 510px; transform-origin: 0 0; pointer-events: none; }
 .gx-scene { position: absolute; left: 0; top: 0; width: 960px; height: 510px; transform-origin: 0 0; }
-.gx-m { position: absolute; white-space: nowrap; line-height: 1; }
+.gx-m { position: absolute; left: 0; top: 0; white-space: nowrap; line-height: 1; will-change: transform; }
 .gx-m .katex { font-size: 1em; }
 .gx-word { font-family: inherit; }
 .gx-chip { background: #fff; border: 1.6px solid #dc2626; border-radius: 7px; padding: 5px 9px 6px; }
@@ -75,5 +75,5 @@
   .gx-card { padding: 10px 8px 10px; }
   .gx-title { font-size: 16.5px; }
   .gx-lede { font-size: 14.5px; }
-  .gx-part { font-size: 11.5px; }
+  .gx-part { font-size: 11.5px; white-space: normal; line-height: 1.25; overflow: visible; }  /* names wrap rather than cut */
 }
