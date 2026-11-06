@@ -42,14 +42,14 @@
     // Each line's choreography is written in its scripted seconds (0 .. data-dur). TRIM then plays stretches of that
     // script faster: [from, to, seconds] plays scripted seconds from..to in that many real seconds. Most are still
     // stretches (nothing scripted moves, so only the shortening shows); in the first part they also speed up its
-    // appearance, its first step (1 s), its rollout (4 s) and its video. The continuous motions (the head turning, the wobble, the blinking and the shaking, the
+    // appearance, its first step (1 s), its rollout (2.5 s) and its video (2.75 s). The continuous motions (the head turning, the wobble, the blinking and the shaking, the
     // walking figure) run on real time, so they keep their speed. Every line still stays up long enough to read.
     const TRIM = {
         noise: [[0, 3.5, 1.6], [3.5, 7, 1.9]],
         step: [[2.1, 3.5, 0.4], [3.5, 5.5, 1], [5.5, 8, 0.9]],
-        steps: [[0, 0.8, 0.4], [0.8, 8.3, 4], [8.3, 10, 0.9]],
-        sample: [[0, 0.5, 0.3], [0.5, 5.6, 4.3], [5.6, 7, 0.7]],
-        worn: [[5.4, 8, 0.5]],
+        steps: [[0, 0.8, 0.4], [0.8, 8.3, 2.5], [8.3, 10, 0.9]],
+        sample: [[0, 0.5, 0.2], [0.5, 5.6, 2.75], [5.6, 7, 0.6]],
+        worn: [[1.4, 5.4, 2.25], [5.4, 8, 0.3]],
         drift: [[2.5, 7, 1.3]],
         vggt: [[3.2, 8, 0.9]],
         calib: [[3.2, 7, 0.8]],
@@ -501,7 +501,7 @@
 
         // ---- the track's cells
         op(gTrack, win(t, at('noise', 2.5), Infinity, 1));
-        op(trackNote, win(t, at('steps', 1.5), at('worn'), 0.6));
+        op(trackNote, win(t, at('steps', 4.2), at('worn'), 0.5));   // once the moving y_n label has passed under it
         const pulseX = lerp(cellX(NSTEP - 1) + 6, cellX(0) - 8, ease(P(t, 'chain', 5, 9)));
         const flashN = nn => clamp(1 - Math.abs(nn) / 0.25);
         for (let c = 0; c < NSTEP; c++) {
