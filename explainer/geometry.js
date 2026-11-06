@@ -39,13 +39,55 @@
     const gauss = rnd => Math.sqrt(-2 * Math.log(1 - rnd())) * Math.cos(2 * Math.PI * rnd());
 
     // ---------- the story's lines and their times ----------
-    const LINES = [...root.querySelectorAll('.gx-lede')].map(el => ({ id: el.dataset.id, dur: +el.dataset.dur, el, beat: el.closest('.gx-beat') }));
-    const S = {}, D = {}, IDX = {};
+    // Each line's choreography is written in its scripted seconds (0 .. data-dur). TRIM then plays stretches of that
+    // script faster: [from, to, seconds] plays scripted seconds from..to in that many real seconds. Most are still
+    // stretches (nothing scripted moves, so only the shortening shows); the three in the first part also speed up its
+    // rollout and its video. The continuous motions (the head turning, the wobble, the blinking and the shaking, the
+    // walking figure) run on real time, so they keep their speed. Every line still stays up long enough to read.
+    const TRIM = {
+        noise: [[3.5, 7, 1.2]],
+        step: [[2.1, 3.5, 0.4], [3.5, 5.5, 1.5], [5.5, 8, 0.9]],
+        steps: [[0, 0.8, 0.4], [0.8, 8.3, 6], [8.3, 10, 0.9]],
+        sample: [[0, 0.5, 0.3], [0.5, 5.6, 4.3], [5.6, 7, 0.7]],
+        worn: [[5.4, 8, 0.5]],
+        drift: [[2.5, 7, 1.3]],
+        vggt: [[3.2, 8, 0.9]],
+        calib: [[3.2, 7, 0.8]],
+        score: [[8, 10, 0.8]],
+        g: [[3.1, 8, 2.2]],
+        chain: [[1.2, 1.5, 0.1], [2, 2.5, 0.2], [3, 3.5, 0.2], [4, 5, 0.3], [9, 11, 0.9]],
+        acts: [[1.1, 1.3, 0.1], [1.5, 2, 0.2], [4, 8, 1.8]],
+        oom: [[0, 0.8, 0.4], [7.6, 10, 1.2]],
+        copy: [[2, 2.5, 0.2], [6.8, 10, 0.9]],
+        many: [[0.2, 1, 0.4], [7.3, 9, 0.9]],
+        draw: [[2.3, 3, 0.3], [7.1, 9, 0.9]],
+        nograd: [[7.3, 9, 0.7]],
+        rerun: [[4.8, 5, 0.1], [7.5, 10, 1]],
+        cancel: [[4.5, 5, 0.2], [6.5, 9, 1]],
+        converge: [[10.2, 12, 0.6]],
+    };
+    const LINES = [...root.querySelectorAll('.gx-lede')].map(el => ({ id: el.dataset.id, script: +el.dataset.dur, el, beat: el.closest('.gx-beat') }));
+    for (const l of LINES) { // the knots of the map from scripted to real seconds
+        l.ka = [0]; l.kr = [0];
+        for (const [a, b, keep] of (TRIM[l.id] || []).slice().sort((x, y) => x[0] - y[0])) {
+            const r = l.kr.at(-1) + (a - l.ka.at(-1));     // real time at a: at the script's own pace since the last knot
+            l.ka.push(a, b); l.kr.push(r, r + keep);
+        }
+        l.kr.push(l.kr.at(-1) + (l.script - l.ka.at(-1))); l.ka.push(l.script);
+        l.dur = l.kr.at(-1);
+    }
+    const interp = (xs, ys, x) => { // piecewise linear, slope 1 past either end
+        if (x <= xs[0]) return ys[0] + (x - xs[0]);
+        for (let i = 1; i < xs.length; i++) if (x <= xs[i]) return xs[i] > xs[i - 1] ? lerp(ys[i - 1], ys[i], (x - xs[i - 1]) / (xs[i] - xs[i - 1])) : ys[i];
+        return ys.at(-1) + (x - xs.at(-1));
+    };
+    const S = {}, D = {}, IDX = {}, LN = {};
     let total = 0;
-    LINES.forEach((l, i) => { l.t0 = total; S[l.id] = total; D[l.id] = l.dur; IDX[l.id] = i; total += l.dur; l.t1 = total; });
+    LINES.forEach((l, i) => { l.t0 = total; S[l.id] = total; D[l.id] = l.dur; IDX[l.id] = i; LN[l.id] = l; total += l.dur; l.t1 = total; });
     const TOTAL = total, LOOP_HOLD = 4;
-    const at = (id, a = 0) => S[id] + a;
-    const P = (t, id, a, b) => clamp((t - S[id] - a) / (b - a));          // progress through seconds a..b of line id
+    const at = (id, a = 0) => S[id] + interp(LN[id].ka, LN[id].kr, a);         // real time of line id's scripted second a
+    const local = (t, id) => interp(LN[id].kr, LN[id].ka, t - S[id]);           // line id's scripted second at real time t
+    const P = (t, id, a, b) => clamp((local(t, id) - a) / (b - a));            // progress through scripted seconds a..b
     // Opacity over [t0, t1]: fades in over fi after t0, out over fo before t1.
     const win = (t, t0, t1 = Infinity, fi = 0.5, fo = fi) => clamp((t - t0) / fi) * (t1 === Infinity ? 1 : clamp((t1 - t) / fo));
     const lineAt = t => { let i = 0; while (i < LINES.length - 1 && t >= LINES[i].t1) i++; return i; };
@@ -403,7 +445,7 @@
     }
 
     function render(t) {
-        const li = lineAt(t), cur = LINES[li].id, tau = t - LINES[li].t0;
+        const li = lineAt(t), cur = LINES[li].id, tau = local(t, cur);
         const on = id => cur === id, past = id => li > IDX[id];
 
         // ---- the camera: the sampler, then the reward, then everything
@@ -428,7 +470,7 @@
         else if (on('sample')) frame = Math.min(11, Math.floor((tau - 0.5) / 0.42));
         else if (k >= 0 && t < at('g')) frame = Math.round(k / (NK - 1) * 11);
         set(sprite, { x: -frame * CARD_W });
-        const walking = on('sample') ? tau * 5.2 : k >= 0 && t < at('g') ? k * 0.5 : 0.6;
+        const walking = on('sample') ? (t - at('sample')) * 5.2 : k >= 0 && t < at('g') ? k * 0.5 : 0.6;
         const jit = JITTER[second ? 1 : 0];
         const p = pose(walking);
         const J = Object.fromEntries(JOINTS.map((j, i) => [j, [p[j][0] + sig * 11 * (jit[i][0] + 0.25 * Math.sin(2.1 * t + i)), p[j][1] + sig * 9 * (jit[i][1] + 0.25 * Math.cos(1.7 * t + 2 * i))]]));
@@ -765,6 +807,7 @@
         if (dirty && (visible || param !== null)) { render(Math.min(t, TOTAL - 1e-3)); ui(); dirty = false; }
         requestAnimationFrame(frameLoop);
     }
+    window.gxTimes = LINES.map(l => [l.id, +l.t0.toFixed(3), +l.t1.toFixed(3)]);
     window.gxSeek = s => { t = clamp(s, 0, TOTAL - 1e-3); playing = false; render(t); ui(); return { line: LINES[lineAt(t)].id, total: TOTAL }; };
     render(Math.min(t, TOTAL - 1e-3)); ui();
     requestAnimationFrame(frameLoop);
