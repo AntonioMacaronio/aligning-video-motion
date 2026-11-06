@@ -559,10 +559,9 @@
         const ra = 44, [a1x, a1y] = dir(psi, ra), [a2x, a2y] = dir(chi, ra);
         set(arc, { d: `M${a1x},${a1y} A${ra},${ra} 0 0 ${dAng > 0 ? 1 : 0} ${a2x},${a2y}` });
         op(arc, arcO);
-        const [lx, ly] = dir((psi + chi) / 2, CR + 13);
-        set(angleText, { x: lx, y: ly });
-        angleText.textContent = `${Math.round(Math.abs(dAng))}°`;
-        op(angleText, arcO * (Math.abs(dAng) > 9 ? 1 : 0));
+        set(angleText, { x: CX, y: CY + 40 });   // in the compass's empty lower half, clear of the names round the rim
+        angleText.textContent = `${Math.round(Math.abs(dAng))}° error`;
+        op(angleText, arcO);
         op(above, win(t, at('worn', 1.3), at('score', 1), 0.6));
         const [hlx, hly] = dir(psi - 24, CR + 17), [clx, cly] = dir(chi + 24, CR + 17);
         place(L.head, hlx, hly, compassO * (1 - P(t, 'calib', 2.4, 3)), 'head');
