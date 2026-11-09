@@ -4,19 +4,20 @@
 
 The project page (<site repo>, https://antoniomacaronio.github.io/aligning-video-motion/): index.html, a blog-style
 write-up of the thesis rendered from post_template.html (its prose, the thesis figures that make_post_figures.py renders
-into figures/, and the Chapter 4 tables), with the thesis's twelve Section 4.4 examples as interactive scenes. Each
-example opens on its figure's task and has tabs for the same clip's other two tasks (make_thesis_scenes.py writes
-recordings/thesis/ and media/thesis/; thesis_examples.json has the titles and captions). gallery.html redirects old
-links to the gallery, and #results to the page's Results section.
+into figures/, and the Chapter 4 tables). Under the title, the three tasks sit side by side, one Section 4.4 thesis
+figure each (SIMPLE), as plain looping videos: the given modality, an arrow, the generated one. Their sources are
+make_thesis_scenes.py's videos (media/thesis/), make_task_inputs.py's clips of the recorded motion and
+make_scene_clips.py's square clips of the 3D scenes (media/scenes/); thesis_examples.json has the examples. gallery.html
+redirects old links to the gallery, and #results to the page's Results section.
 The gallery (<samples repo>, https://antoniomacaronio.github.io/aligning-video-motion-samples/): index.html, the
 gallery's 64 clips rewritten for an outside reader (a header in the thesis's terms, without internal paths, commit
 hashes or run codenames; tab labels; a link back to the project page), its viser recordings, and its videos re-encoded
 once (H.264 CRF 26, every frame a keyframe; media/.encoded.json). The two are separate repos because GitHub Pages caps
 each site at 1 GB.
 
-On both pages a 3D scene loads, and the videos beside it play, only while the example (or gallery row) is fully on
-screen, or fills the screen when it is taller than it; the videos then follow the scene's playback clock (the viewer's
-timeline, read from the same-origin iframe: video frame k is motion frame 3k).
+In the gallery a 3D scene loads, and the videos beside it play, only while its row is fully on screen, or fills the
+screen when it is taller than it; the videos then follow the scene's playback clock (the viewer's timeline, read from
+the same-origin iframe: video frame k is motion frame 3k). On the project page the videos follow one clock instead.
 """
 import html
 import json
@@ -229,18 +230,6 @@ s = s.replace(old, f'if (location.hash === "#results") location.replace("{FIGURE
     f'<script>location.replace(location.hash === "#results" ? "{FIGURES_URL}#results" : "{SAMPLES_URL}" + location.hash);'
     f'</script></head><body><p>The gallery moved to <a href="{SAMPLES_URL}">{SAMPLES_URL}</a>.</p></body></html>\n')
 
-TASKS = {
-    "joint": dict(label="Generate both", note="The video and the motion are both generated from the text prompt and the "
-                  "first video frame.", video="Generated video", motion="Generated motion", given=()),
-    "motion_cond": dict(label="Video from motion", note="The video is generated from the text prompt, the first frame "
-                        "and the recorded motion shown.", video="Generated video", motion="Input motion (recorded)",
-                        given=("motion",)),
-    "video_cond": dict(label="Motion from video", note="The motion is generated from the text prompt and the recorded "
-                       "video shown.", video="Input video (recorded)", motion="Generated motion", given=("video",)),
-}
-
-# The arrow between a conditioned task's panels points from the given modality to the generated one.
-SECTIONS = (("joint", "Figures 4.1 and 4.2"), ("motion_cond", "Figures 4.3 and 4.4"), ("video_cond", "Figures 4.5 and 4.6"))
 examples = json.loads((site / "thesis_examples.json").read_text())
 for video in sorted((site / "media" / "thesis").glob("*.mp4")):
     poster = video.with_suffix(".jpg")
@@ -248,105 +237,83 @@ for video in sorted((site / "media" / "thesis").glob("*.mp4")):
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(video), "-frames:v", "1", "-q:v", "3", str(poster)], check=True)
 
 
-def pane(e, task, active):
-    """One task of an example: its video beside its 3D scene (the figure's task under the example's own name)."""
-    name = e["name"] if task == e["mode"] else f"{e['name']}__{task}"
-    info = json.loads((site / "recordings" / "thesis" / f"{name}.json").read_text())
-    # The site camera frames the content like the figure's tight crop (make_thesis_scenes.site_camera). Without a
-    # field of view the viewer would use three.js's 75 deg, wider than the figure's 50.
-    position, look_at = info.get("site_position", info["position"]), info.get("site_look_at", info["look_at"])
-    camera = (f"initialCameraPosition={','.join(map(str, position))}"
-              f"&amp;initialCameraLookAt={','.join(map(str, look_at))}&amp;initialCameraUp=0,0,1"
-              f"&amp;initialCameraFov={info.get('site_fov', info['fov']):.4f}")
-    t = TASKS[task]
-    flow = {("video",): "right", ("motion",): "left"}.get(t["given"])
-    arrow = f'<span class="flow {flow}" aria-hidden="true"></span>' if flow else ""
-    return (f'<div class="pane" data-task="{task}"{"" if active else " hidden"}><p class="task-note">{t["note"]}</p>'
-            f'<div class="body" style="--aspect: {info["aspect"]:.3f}"><div class="video">{arrow}'
-            f'<p class="panel-label">{t["video"]}</p>'
-            f'<video src="media/thesis/{name}.mp4" poster="media/thesis/{name}.jpg" muted loop playsinline preload="none">'
-            f'</video></div><div class="motion"><p class="panel-label">{t["motion"]}</p><div class="scene">'
-            f'<div class="hint">the 3D scene loads when the example is fully on screen</div>'
-            f'<iframe data-src="viser/index.html?playbackPath=../recordings/thesis/{name}.viser&amp;{camera}" '
-            f'title="{html.escape(e["title"])}: {t["label"].lower()}"></iframe></div></div></div></div>')
+# The viewer: the three tasks side by side, one thesis figure each, as plain looping videos: the given modality, an
+# arrow, the generated one (the first task generates both, so it has no arrow). The 3D scenes are make_scene_clips.py's
+# square clips; the given motion is make_task_inputs.py's clip of the recorded motion.
+SIMPLE = (("joint_1", "Generates video and motion"),             # in the three-tasks figure's order, which they follow
+          ("video_cond_3", "Given video, generates motion"),
+          ("motion_cond_1", "Given motion, generates video"))
 
 
-def card(e, shown, opens=None):
-    """One example: its title and caption, a tab per task and a pane per task, open on `opens` (default: its figure's
-    task, which its tab marks)."""
-    mode, opens = e["mode"], opens or e["mode"]
-    tabs = "".join(
-        f'<button role="tab" data-task="{task}" aria-selected="{"true" if task == opens else "false"}">{t["label"]}'
-        f'{" <span class=fig-mark>thesis figure</span>" if task == mode else ""}</button>' for task, t in TASKS.items())
-    return (f'<div class="example" id="{e["name"]}"{"" if shown else " hidden"}><h4>{html.escape(e["title"])}</h4>'
-            f'<p class="caption">{html.escape(e["caption"])}</p><div class="tabs" role="tablist">{tabs}</div>'
-            + "".join(pane(e, task, task == opens) for task in TASKS) + "</div>")
+def simple_column(name, heading):
+    mode = next(e for e in examples if e["name"] == name)["mode"]
+    video = (f'<video class="clip" src="media/thesis/{name}.mp4" poster="media/thesis/{name}.jpg" muted playsinline '
+             f'preload="auto"></video>')
+    scene = (f'<video class="scene-clip" data-fps="30" src="media/scenes/{name}.mp4" poster="media/scenes/{name}.jpg" '
+             f'muted playsinline preload="auto"></video>')
+    motion = (f'<video class="motion-clip" src="media/thesis/{name}__input_motion.mp4" '
+              f'poster="media/thesis/{name}__input_motion.jpg" muted playsinline preload="auto"></video>')
+    arrow = '<span class="pair-arrow" aria-hidden="true"></span>'
+    left, middle, right = {"joint": (video, '<span></span>', scene), "motion_cond": (motion, arrow, video),
+                           "video_cond": (video, arrow, scene)}[mode]
+    return (f'<div class="simple-col" role="group" aria-label="{heading}"><p class="simple-head">{heading}</p>'
+            f'<div class="simple-pair">{left}{middle}{right}</div></div>')
 
 
+# The three-tasks figure's animation schedule (tasks_animation.py), which the three tasks at the top follow.
+from tasks_animation import LOOP as _TASK_LOOP, PHASE as _TASK_PHASE, SPEED as _TASK_SPEED  # noqa: E402
+TASK_CLOCK = f"const TASK_PHASE = {_TASK_PHASE}, TASK_SPEED = {_TASK_SPEED}, TASK_LOOP = {_TASK_LOOP};\n"
 PAGE_JS = """const RAMP = [[46, 184, 114], [52, 136, 219], [142, 68, 173]];
 function ramp(f) {
   const x = Math.min(Math.max(f, 0), 1) * (RAMP.length - 1), i = Math.min(Math.floor(x), RAMP.length - 2), t = x - i;
   return "rgb(" + RAMP[i].map((c, k) => Math.round(c + t * (RAMP[i + 1][k] - c))).join(",") + ")";
 }
-const MAX_LIVE = 3, live = [];
-function unload(frame) {
-  const i = live.indexOf(frame);
-  if (i >= 0) live.splice(i, 1);
-  if (frame.dataset.loaded === "1") { frame.src = "about:blank"; frame.dataset.loaded = "0"; }
-  frame.previousElementSibling.style.display = "";
-}
-function load(frame) {
-  if (frame.dataset.loaded === "1") { live.splice(live.indexOf(frame), 1); live.push(frame); return; }
-  frame.src = frame.dataset.src; frame.dataset.loaded = "1"; frame.previousElementSibling.style.display = "none";
-  live.push(frame);
-  while (live.length > MAX_LIVE) unload(live[0]);
-}
-// One entry per task pane; only the selected pane of an example is displayed, so only it can become visible.
-const panes = [...document.querySelectorAll(".pane")].map((pane) => ({
-  pane, body: pane.querySelector(".body"), video: pane.querySelector("video"), frame: pane.querySelector("iframe"),
-  shown: -1, on: false,
-}));
-function setOn(p, on) {
-  if (p.on === on) return;
-  p.on = on;
-  p.shown = -1;
-  if (on) { load(p.frame); startVideo(p.video); }
-  else { unload(p.frame); p.video.pause(); }
-}
-const observer = new IntersectionObserver((entries) => entries.forEach((e) => {
-  const p = panes.find((x) => x.body === e.target);
-  if (p) setOn(p, !p.pane.hidden && fullyVisible(e));
-}), { threshold: THRESHOLDS });
-panes.forEach((p) => observer.observe(p.body));
-document.querySelectorAll(".example").forEach((example) => {
-  example.querySelectorAll('.tabs [role="tab"]').forEach((tab) => tab.addEventListener("click", () => {
-    example.querySelectorAll('.tabs [role="tab"]').forEach((b) => b.setAttribute("aria-selected", String(b === tab)));
-    for (const p of panes) {
-      if (!example.contains(p.pane)) continue;
-      const selected = p.pane.dataset.task === tab.dataset.task;
-      if (!selected) setOn(p, false);
-      p.pane.hidden = !selected;
-    }
-  }));
-});
-function tick() {
-  for (const p of panes) {
-    if (!p.on) continue;
-    const v = p.video, t = sceneTime(p.frame);
-    if (t !== null && v.readyState >= 1) {
-      if (!v.paused) v.pause();
-      const k = sceneFrame(t);
-      if (k !== p.shown) { v.currentTime = (k + 0.5) / VIDEO_FPS; p.shown = k; }
-      v.style.borderColor = ramp(k / LAST_FRAME);  // the body's color at motion frame 3k
-    } else {
-      if (v.readyState === 0 && v.networkState !== HTMLMediaElement.NETWORK_LOADING) startVideo(v);
-      if (v.duration) v.style.borderColor = ramp(v.currentTime / v.duration);  // the scene is loading: the video plays on its own
-    }
+// The three tasks: every video follows one clock of LOOP seconds, so they all loop in step. A 10 fps video shows frame
+// floor(10 t) and a 30 fps scene clip frame floor(30 t) (video frame k is motion frame 3k), and a video's frame takes the
+// body's color at that moment. They run while on screen, and hold their first frame for readers who ask for reduced
+// motion.
+const LOOP = (LAST_FRAME + 1) / VIDEO_FPS, simple = document.querySelector(".simple-grid");
+const clips = [...simple.querySelectorAll("video")], still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let start = null, running = false, onScreen = false;
+function show(t) {
+  for (const v of clips) {
+    if (v.readyState < 1) continue;
+    const fps = +(v.dataset.fps || VIDEO_FPS), k = Math.min(Math.floor(t * fps + 1e-6), Math.round(v.duration * fps) - 1);
+    if (k !== +v.dataset.shown) { v.currentTime = (k + 0.5) / fps; v.dataset.shown = k; }
   }
-  requestAnimationFrame(tick);
+  const color = ramp(sceneFrame(t) / LAST_FRAME);
+  for (const v of simple.querySelectorAll("video.clip")) v.style.borderColor = color;
 }
-requestAnimationFrame(tick);
-// Contents: mark the section being read, and fade the list while a wide figure or example passes beside it.
+// The three tasks also follow the three-tasks figure below, reading its overlay's animation clock from the same-origin
+// <object>: while the figure plays a task (its rows, in the columns' order: joint generation, video-conditioned motion,
+// motion-conditioned video), that task's column stays and the other two fade; in the figure's pause all three show.
+const columns = [...simple.querySelectorAll(".simple-col")];
+const tasksFigure = document.querySelector('object.anim[data$="arch_tasks_anim.svg"]');
+function followFigure() {
+  let active = -1;
+  try {
+    const svg = tasksFigure && tasksFigure.contentDocument && tasksFigure.contentDocument.documentElement;
+    if (svg && svg.getCurrentTime) {
+      const t = (svg.getCurrentTime() * TASK_SPEED) % TASK_LOOP, row = Math.floor(t / TASK_PHASE);   // schedule units
+      if (row < 3 && t - row * TASK_PHASE < TASK_PHASE - 0.25) active = row;
+    }
+  } catch (error) { /* not loaded yet */ }
+  simple.classList.toggle("focus", active >= 0);
+  columns.forEach((c, i) => c.classList.toggle("on", i === active));
+}
+function frame(now) {
+  if (start === null) start = now;
+  show(((now - start) / 1000) % LOOP);
+  followFigure();
+  if (onScreen) requestAnimationFrame(frame);
+  else running = false;
+}
+new IntersectionObserver(([e]) => {
+  onScreen = e.isIntersecting;
+  if (onScreen && !still && !running) { running = true; requestAnimationFrame(frame); }
+}).observe(simple);
+clips.forEach((v) => v.addEventListener("loadedmetadata", () => { if (!running) show(0); }));
+// Contents: mark the section being read; the list appears once the reader has scrolled past the thesis figures viewer.
 const tocLinks = [...document.querySelectorAll(".toc a")];
 const tocTargets = tocLinks.map((a) => document.getElementById(a.hash.slice(1)));
 function markToc() {
@@ -356,42 +323,15 @@ function markToc() {
 }
 addEventListener("scroll", markToc, { passive: true });
 markToc();
-const toc = document.querySelector(".toc"), besideToc = new Set();
-const tocObserver = new IntersectionObserver((entries) => {
-  entries.forEach((e) => (e.isIntersecting ? besideToc.add(e.target) : besideToc.delete(e.target)));
-  toc.classList.toggle("dim", besideToc.size > 0);
-}, { rootMargin: "-90px 0px -35% 0px" });
-document.querySelectorAll("main .wide").forEach((el) => tocObserver.observe(el));
-// The thesis figures viewer: one example on the stage at a time, picked from the strip; #<example> opens one.
-const stageCards = [...document.querySelectorAll(".stage .example")], thumbs = [...document.querySelectorAll(".thumb")];
-function showExample(name) {
-  const card = stageCards.find((c) => c.id === name) || stageCards[0];
-  for (const c of stageCards) {
-    if (c !== card) for (const p of panes) if (c.contains(p.pane)) setOn(p, false);
-    c.hidden = c !== card;
-  }
-  thumbs.forEach((t) => t.setAttribute("aria-pressed", String(t.dataset.example === card.id)));
-}
-thumbs.forEach((t) => t.addEventListener("click", () => {
-  showExample(t.dataset.example);
-  history.replaceState(null, "", "#" + t.dataset.example);
-}));
-const linked = stageCards.find((c) => "#" + c.id === location.hash);
-showExample(linked ? linked.id : stageCards[0].id);
-if (linked) document.getElementById("examples").scrollIntoView();"""
+const toc = document.querySelector(".toc"), viewer = document.getElementById("examples");
+function placeToc() { toc.classList.toggle("away", viewer.getBoundingClientRect().bottom > 96); }   // 96 px: the list's top
+addEventListener("scroll", placeToc, { passive: true });
+addEventListener("resize", placeToc);
+placeToc();"""
 
 MAIN = (site / "post_template.html").read_text()
-# The viewer's examples in thesis order (Figures 4.1 to 4.6); it opens on the first. To lead with another example, name
-# it here and the task its tab opens on, e.g. LEAD, LEAD_TASK = "motion_cond_3", "joint".
-LEAD, LEAD_TASK = None, None
-order = sorted(examples, key=lambda e: e["name"] != LEAD) if LEAD else examples
-strip = "".join(
-    f'<button type="button" class="thumb" data-example="{e["name"]}" aria-pressed="{"true" if i == 0 else "false"}" '
-    f'title="{html.escape(e["title"])}"><img src="figures/thumbs/{e["name"]}.jpg" width="176" height="176" '
-    f'alt="{html.escape(e["title"])}"></button>' for i, e in enumerate(order))
-slots = {"<!--STAGE-->": "\n".join(card(e, i == 0, LEAD_TASK if i == 0 else None) for i, e in enumerate(order)),
-         "<!--THUMBS-->": strip,
-         "<!--FOOTER-->": FOOTER, "<!--SCRIPT-->": SYNC_JS + PAGE_JS}
+slots = {"<!--STAGE-->": '<div class="simple-grid">' + "".join(simple_column(*c) for c in SIMPLE) + "</div>",
+         "<!--FOOTER-->": FOOTER, "<!--SCRIPT-->": SYNC_JS + TASK_CLOCK + PAGE_JS}
 for slot, value in slots.items():
     assert MAIN.count(slot) == 1, slot
     MAIN = MAIN.replace(slot, value)
@@ -399,17 +339,17 @@ assert MAIN.count("<!--GALLERY_URL-->") == 1, MAIN.count("<!--GALLERY_URL-->")
 MAIN = MAIN.replace("<!--GALLERY_URL-->", SAMPLES_REL)
 assert not re.search(r"<!--[A-Z_:a-z]+-->", MAIN), "unfilled slot"
 # Animated overlays (make_post_figures.py's OVERLAID) reach data-pad drawing units past their figure on every side;
-# extend each <img class="anim"> past the figure's box by as much, in percent of that box.
+# extend each overlay (<object class="anim">) past the figure's box by as much, in percent of that box.
 def _place_overlay(m):
     head = (site / m.group(1)).read_text()[:600]
-    w, h, pad = (float(re.search(rf'{key}="([\d.]+)"', head).group(1)) for key in ("width", "height", "data-pad"))
+    w, h, pad = (float(re.search(rf' {key}="([\d.]+)"', head).group(1)) for key in ("data-width", "data-height", "data-pad"))
     fw, fh = w - 2 * pad, h - 2 * pad
     style = (f"left: {-100 * pad / fw:.4f}%; top: {-100 * pad / fh:.4f}%; width: {100 * w / fw:.4f}%; "
              f"height: {100 * h / fh:.4f}%")
     return f'{m.group(0)} style="{style}"'
 
 
-MAIN = re.sub(r'<img class="anim" src="(figures/[^"]+_anim\.svg)"', _place_overlay, MAIN)
+MAIN = re.sub(r'<object class="anim" data="(figures/[^"]+_anim\.svg)"', _place_overlay, MAIN)
 (site / "index.html").write_text(MAIN)
 
 for page, text in (("samples index.html", s), ("site index.html", MAIN)):

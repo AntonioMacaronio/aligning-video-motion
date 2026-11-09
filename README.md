@@ -4,8 +4,9 @@ Static project page for Anthony Zhang's M.S. thesis (UC Berkeley EECS, 2026), se
 `gh-pages` branch at https://antoniomacaronio.github.io/aligning-video-motion/. The gallery of all 64 evaluation clips is
 a separate repo, `aligning-video-motion-samples` (GitHub Pages allows 1 GB per site).
 
-- `post_template.html`: the page's source (prose, equations, tables). `build_site.py` fills its slots with the twelve
-  interactive thesis examples and the playback script, and writes `index.html`; edit the template, not `index.html`.
+- `post_template.html`: the page's source (prose, equations, tables). `build_site.py` fills its slots with the three
+  tasks side by side (one thesis figure each, `SIMPLE`) and the playback script, and writes `index.html`; edit the
+  template, not `index.html`.
 - `figures/`: the thesis figures the page shows, written by `make_post_figures.py` (macOS): JPEGs for the figures with
   photos and renders, SVGs for the line drawings. The geometry sidecar's SVG carries the animation from
   `sidecar_animation.py`; `arch_sidecar_static.svg` is its still version for readers who ask for reduced motion.
@@ -13,7 +14,11 @@ a separate repo, `aligning-video-motion-samples` (GitHub Pages allows 1 GB per s
   draws the whole story as a function of time on one stage and runs its controls; the story's lines, their ids and
   their lengths in seconds are the `.gx-lede` elements in the template; `geometry.css` styles it. `frames.jpg` and
   `noise*.png` come from `make_explainer_assets.py` (the staircase example's video, and pixel noise).
-- `recordings/thesis/`, `media/thesis/`: the examples' viser recordings and videos, from `make_thesis_scenes.py`.
+- `media/thesis/`: the examples' videos, from `make_thesis_scenes.py`, and their recorded motion as clips
+  (`<example>__input_motion.mp4`), from `make_task_inputs.py`.
+- `media/scenes/`: square clips of the examples' 3D scenes (the body in the video's reconstruction), from
+  `make_scene_clips.py`.
+- `recordings/thesis/`: the examples' viser recordings, from `make_thesis_scenes.py` (the page no longer shows them).
 - `favicon.ico`, `favicon-32.png`, `apple-touch-icon.png`: the tab icon, a body mesh through a fisheye lens framed like an egocentric frame, from `make_favicon.py` (the gallery links to the same files).
 - `viser/`: the static viser client; each scene loads `viser/index.html?playbackPath=../recordings/thesis/<name>.viser`.
 - `gallery.html`: a redirect for old links to the gallery.

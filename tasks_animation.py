@@ -5,7 +5,8 @@
 source_svg is the thesis's figure-src/architecture-20261024/make_fig_tasks.py output, the drawing the JPEG is rendered
 from. The clip's frames (the video-conditioned row's given video) and its bodies (the motion-conditioned row's given
 motion) are taken from it. The overlay is a transparent SVG in the drawing's coordinates, cropped to the JPEG's view
-box plus PAD. The page lays it over the JPEG with SVG animation (<animate>), so no script is needed. Readers who ask for reduced
+box plus PAD. The page lays it over the JPEG in an <object> (so that its script can read the animation's clock and
+light up the matching task at the top); the animation itself is SVG's (<animate>), no script. Readers who ask for reduced
 motion don't get the overlay (the page's CSS hides it). Layout constants are make_fig_tasks.py's, and check_layout()
 compares them with the source.
 
@@ -130,8 +131,10 @@ def overlay(source_svg, view_box):
         ramp = _animate("opacity", [(0, 0), (d0, 0), (d1, 1), (end, 1), (end + 0.3, 0)])
         a.append(f'<g opacity="0">{ramp}{"".join(clean)}</g>')
     # The overlay reaches PAD units past the figure on every side, so the glows on the first row and the last column are
-    # not clipped; data-pad tells build_site.py how far to extend the <img> past the figure's box.
+    # not clipped; data-pad tells build_site.py how far to extend the overlay past the figure's box, and data-width and
+    # data-height its size in drawing units (it fills its box: width and height 100%).
     x0, y0, w, h = view_box
     x0, y0, w, h = round(x0 - PAD, 2), round(y0 - PAD, 2), round(w + 2 * PAD, 2), round(h + 2 * PAD, 2)
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="{w}" height="{h}" '
-            f'viewBox="{x0} {y0} {w} {h}" data-pad="{PAD}"><defs>{defs}</defs>{"".join(a)}</svg>\n')
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100%" height="100%" '
+            f'data-width="{w}" data-height="{h}" viewBox="{x0} {y0} {w} {h}" data-pad="{PAD}"><defs>{defs}</defs>'
+            f'{"".join(a)}</svg>\n')

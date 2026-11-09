@@ -206,9 +206,46 @@ def encode_video(scene_dir, video):
                     "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an", str(video)], check=True)
 
 
+def figure_scene(name, base, root):
+    """A scene's cloud as its figure cuts it: (scene.npz's arrays, points, colors, the floor's middle, the figure
+    options, the figure camera's view, and the site's opening camera (position, look_at, fov))."""
+    scene = dict(np.load(root / "scenes" / name / "scene.npz"))
+    camera = FIGSRC / "cameras" / f"{base}.json"
+    if root is TASKS and (TASKS / "cameras" / f"{name}.json").exists():  # a tab with its own saved view
+        camera = TASKS / "cameras" / f"{name}.json"
+    views = json.loads((FIGSRC / "views.json").read_text())
+    extras = views.get(base, views["default"])
+    height = round(2400 / (json.loads(camera.read_text()).get("aspect") or 2.4))
+    argv = ["--width", "2400", "--height", str(height), *COMMON,
+            *([] if "--pick" in extras else ["--every", "2"]), *extras, "--camera-json", str(camera), "--cut-from-view"]
+    args = figure_options(argv)
+    stored = scene["vertices"].copy()
+    points, colors, middle, view = figure_points(dict(scene), args)
+    return scene, points, colors, middle, args, view, site_camera(points, stored, view)
+
+
+def thin(points, colors):
+    """At most MAX_POINTS of the cloud, the same ones on every run."""
+    if len(points) > MAX_POINTS:
+        pick = np.sort(np.random.default_rng(0).choice(len(points), MAX_POINTS, replace=False))
+        points, colors = points[pick], colors[pick]
+    return points, colors
+
+
+def posed_body(root, example, scene, skinner, identities):
+    """The body at every motion frame, as gallery_scene.py posed its snapshots, and its largest distance from them."""
+    clip = example["clip"]
+    motion = torch.load(root / example["cohort"] / "motion" / f"{clip}.pt", map_location="cpu",
+                        weights_only=False)[example["motion"]].double().numpy()
+    motion = correct_head_rotation(motion, head_to_cpf_offset(clip))
+    joints, _, _ = motion_v2_to_joints(motion)
+    vertices = skinner.from_motion_v2(motion, identities.bind_state(subject_id_from_clip_name(clip)),
+                                      positions_mode="fk", joints=joints).astype(np.float32)
+    return vertices, float(np.abs(vertices[scene["snapshots"]] - scene["vertices"]).max())
+
+
 def main():
     examples = json.loads((FIGSRC / "examples.json").read_text())
-    views = json.loads((FIGSRC / "views.json").read_text())
     skinner, identities = MhrMeshSkinner(), SubjectIdentities.load(SUBJECT_IDENTITY_PATH)
     (SITE / "recordings" / "thesis").mkdir(parents=True, exist_ok=True)
     (SITE / "media" / "thesis").mkdir(parents=True, exist_ok=True)
@@ -218,7 +255,6 @@ def main():
         jobs += [(e["name"], e["example"], TASKS, e) for e in json.loads((TASKS / "examples_tasks.json").read_text())]
     port = 9400
     for name, base, root, example in jobs:
-        clip = example["clip"]
         if NAMES and name not in NAMES:
             continue
         scene_dir = root / "scenes" / name
@@ -227,18 +263,7 @@ def main():
             encode_video(scene_dir, video)
             print(name, f"video {video.stat().st_size / 1e6:.2f} MB", flush=True)
             continue
-        scene = dict(np.load(scene_dir / "scene.npz"))
-        camera = FIGSRC / "cameras" / f"{base}.json"
-        if root is TASKS and (TASKS / "cameras" / f"{name}.json").exists():  # a tab with its own saved view
-            camera = TASKS / "cameras" / f"{name}.json"
-        extras = views.get(base, views["default"])
-        height = round(2400 / (json.loads(camera.read_text()).get("aspect") or 2.4))
-        argv = ["--width", "2400", "--height", str(height), *COMMON,
-                *([] if "--pick" in extras else ["--every", "2"]), *extras, "--camera-json", str(camera), "--cut-from-view"]
-        args = figure_options(argv)
-        snapshots, stored = scene["snapshots"].copy(), scene["vertices"].copy()
-        points, colors, middle, view = figure_points(dict(scene), args)
-        site_position, site_look_at, site_fov = site_camera(points, stored, view)
+        scene, points, colors, middle, args, view, (site_position, site_look_at, site_fov) = figure_scene(name, base, root)
         if CAMERAS_ONLY:
             target = SITE / "recordings" / "thesis" / f"{name}.json"
             info = json.loads(target.read_text())
@@ -247,18 +272,8 @@ def main():
             target.write_text(json.dumps(info))
             print(name, "site camera", info["site_look_at"], f"fov {np.degrees(site_fov):.1f} deg", flush=True)
             continue
-        if len(points) > MAX_POINTS:
-            pick = np.random.default_rng(0).choice(len(points), MAX_POINTS, replace=False)
-            points, colors = points[np.sort(pick)], colors[np.sort(pick)]
-
-        # The body at every frame, as gallery_scene.py posed its snapshots.
-        motion = torch.load(root / example["cohort"] / "motion" / f"{clip}.pt", map_location="cpu",
-                            weights_only=False)[example["motion"]].double().numpy()
-        motion = correct_head_rotation(motion, head_to_cpf_offset(clip))
-        joints, _, _ = motion_v2_to_joints(motion)
-        vertices = skinner.from_motion_v2(motion, identities.bind_state(subject_id_from_clip_name(clip)),
-                                          positions_mode="fk", joints=joints).astype(np.float32)
-        error = float(np.abs(vertices[snapshots] - stored).max())
+        points, colors = thin(points, colors)
+        vertices, error = posed_body(root, example, scene, skinner, identities)
         assert error < 1e-3, f"{name}: posed body differs from the figure's snapshots by {error:.4f} m"
 
         server = viser.ViserServer(host="127.0.0.1", port=port, verbose=False)
