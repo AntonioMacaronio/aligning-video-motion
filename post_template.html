@@ -78,9 +78,10 @@ main > .wide.viewer { grid-column: full; padding: 0 20px; }
 .simple-pair { display: grid; grid-template-columns: minmax(0, 1fr) 34px minmax(0, 1fr); align-items: center; }
 .simple-pair video { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; box-sizing: border-box; border-radius: 8px; }
 .simple-pair .scene-clip, .simple-pair .motion-clip { border: 1px solid #e3e3e3; background: #fff; }
-/* while the three-tasks figure below plays one task, the other two columns fade (build_site.py's followFigure) */
+/* while the three-tasks figure below plays one task, the other two columns fade (build_site.py's followFigure); not on
+   phones, where the columns stack and the figure is far below them */
 .simple-col { transition: opacity 0.35s; }
-.simple-grid.focus .simple-col:not(.on) { opacity: 0.28; }
+@media (min-width: 901px) { .simple-grid.focus .simple-col:not(.on) { opacity: 0.28; } }
 .pair-arrow { height: 16px; margin: 0 4px; background: no-repeat right center / 10px 16px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 16'%3E%3Cpath d='M2 3.5 6.5 8 2 12.5' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"),
   no-repeat left center / calc(100% - 3px) 2px linear-gradient(#64748b, #64748b); }
 @media (max-width: 900px) { .simple-grid { grid-template-columns: minmax(0, 1fr); gap: 28px; } .simple-col { width: 100%; max-width: 540px; margin: 0 auto; } }
