@@ -6,7 +6,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="description" content="One diffusion model for egocentric video and the wearer's full-body motion, aligned with a curriculum and a 3D reward computed through copied gradients.">
-<!-- The page source: build_site.py fills the STAGE, GALLERY_URL, FOOTER and SCRIPT slots and writes index.html.
+<!-- The page source: build_site.py fills the STAGE, COMPARISON, GALLERY_URL, FOOTER and SCRIPT slots and writes index.html.
      Edit this file, not index.html. -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <link rel="stylesheet" href="explainer/geometry.css">
@@ -75,6 +75,7 @@ footer { font-size: 13.5px; color: var(--muted); text-align: center; max-width: 
 main > .wide.viewer { grid-column: full; padding: 0 20px; }
 .teaser-player { max-width: 1400px; margin: 8px auto 0; }
 video.teaser { aspect-ratio: 2 / 1; background: #fff; }
+figure .player video { border-radius: 6px; }
 /* The page's video player (build_site.py's player()): the browser's controls give way to a round play/pause button and a
    slim track that seeks, shown on hover, while paused, and always on touch screens. A segmented track has one part per
    segment of the video. */
@@ -83,6 +84,8 @@ video.teaser { aspect-ratio: 2 / 1; background: #fff; }
 .player-bar { position: absolute; left: 14px; right: 14px; bottom: 12px; display: flex; align-items: center; gap: 12px; opacity: 0; transition: opacity 0.2s; }
 .player:hover .player-bar, .player:focus-within .player-bar, .player.paused .player-bar { opacity: 1; }
 @media (hover: none) { .player-bar { opacity: 1; } }
+/* under the video instead of over it, for a video with no margin at its bottom */
+.player.below .player-bar { position: static; margin: 8px 0 0; opacity: 1; }
 .player-toggle { flex: none; width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 1px solid #d0d7de; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.15);
   background: #fff no-repeat center / 12px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 1.5v9M9 1.5v9' stroke='%23475569' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E"); }
 .player.paused .player-toggle { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 1.5l7 4.5-7 4.5z' fill='%23475569'/%3E%3C/svg%3E"); }
@@ -102,7 +105,7 @@ video.teaser { aspect-ratio: 2 / 1; background: #fff; }
 <a href="#model">One model, three tasks</a>
 <a href="#overview">Overview</a>
 <a href="#motivation">Why align video and motion?</a>
-<a href="#data-architecture">Data and architecture</a>
+<a href="#architecture">Architecture</a>
 <a href="#training">Training in four phases</a>
 <a href="#geometry">Geometric post-training</a>
 <a class="sub" href="#sidecar">The geometry sidecar</a>
@@ -134,7 +137,8 @@ For example, the camera pans exactly how your head turns, and your hands appear 
 one model that generates egocentric video and the wearer's full-body motion together, or either one given the other. We
 extend the 8.3-billion-parameter video diffusion model <a href="https://arxiv.org/abs/2511.18870">HunyuanVideo&nbsp;1.5</a>
 with a motion stream and train it on about 180 hours of paired video and motion from
-<a href="https://arxiv.org/abs/2603.18496">NymeriaPlus</a>.</p>
+<a href="https://arxiv.org/abs/2603.18496">NymeriaPlus</a>, recorded with Project Aria glasses and an inertial motion-capture
+suit, holding out 20 participants entirely for evaluation.</p>
 <p>A model trained only to denoise each modality might learn their agreement implicitly, but has noticeable inconsistency. For example, the camera movement of its
 generated video and its generated head turn differently and contradict one another. We close part of this inconsistency in two ways, one implicit and one explicit. The former is a curriculum that hides the
 text prompt and gives one modality clean, so that each stream has to read the other. Geometric post-training then scores the
@@ -153,25 +157,18 @@ a video and a motion that describe different events.</p>
 <p>In egocentric video, such disagreement is the most visible, because the camera is mounted on the wearer's glasses. On the
 recorded video and motion, the camera rotation VGGT-&Omega; recovers and the head's rotation differ by only about 4&deg;. When a
 pretrained video model is finetuned for joint generation, they differ by 22&deg; on average.</p>
+<figure><!--COMPARISON-->
+<figcaption>Four of the held-out clips where the two models differ most, each sampled from the same seed by joint
+finetuning alone (top) and by the final model (bottom). Green: where the generated head looks. Blue: where VGGT-&Omega;
+places the camera of the generated video. Right: how far each has turned since the first frame. After joint finetuning
+alone the two lie 30&ndash;61&deg; apart on these clips; the final model keeps them 6&ndash;26&deg; apart (over all 64 clips:
+21.5&deg; against 16.7&deg;).</figcaption></figure>
 <p>The direct fix is to treat the frozen estimator as a differentiable reward and backpropagate through the sampler, as
 <a href="https://arxiv.org/abs/2309.17400">DRaFT</a> and <a href="https://arxiv.org/abs/2310.03739">AlignProp</a> do for
 images. For an 8B-parameter video model, that means differentiating through dozens of denoising steps, the video decoder and
 the estimator, which is prohibitively expensive in both memory and time.</p>
 
-<h2 id="data-architecture">Data and architecture</h2>
-<h3>Data</h3>
-<p>We train on NymeriaPlus, an extension of the <a href="https://arxiv.org/abs/2406.09905">Nymeria</a> dataset, in which
-people do everyday activities while wearing <a href="https://arxiv.org/abs/2308.13561">Project Aria</a> glasses and an
-inertial motion-capture suit. We use 790 recordings from 196 participants, about 200 hours, and hold out 20 participants entirely (about 180 hours remain
-for training), so every result on this page is on people the model never saw in training. Each training clip pairs 4.8 seconds of egocentric video with the wearer's 
-full-body motion and a text prompt describing the wearer's actions.</p>
-<figure><img src="figures/data_example_kitchen_walk.jpg" width="2000" height="1581" loading="lazy" alt="A training example from NymeriaPlus">
-<figcaption>A training example from NymeriaPlus, seen from behind the wearer, who opens and closes drawers, turns right and
-walks about 2.2&nbsp;m toward the stove. Top: six of the clip's 49 video frames. Middle: the MHR body every 0.67&nbsp;s,
-colored from green to purple, in a VGGT-&Omega; point cloud of the kitchen; each frame's border matches the body's color at the
-same time. Bottom: the text prompt.</figcaption></figure>
-
-<h3>Architecture</h3>
+<h2 id="architecture">Architecture</h2>
 <p>We turn HunyuanVideo&nbsp;1.5 into a multimodal diffusion transformer (MM-DiT) with a motion, video, and text stream. Each stream has its own modulation, projections and feed-forward network. They meet in
 one self-attention over the concatenated sequence, with EgoTwin's cross-modal mask deciding which video latents and motion
 frames attend to each other.</p>
@@ -338,7 +335,6 @@ recorded head, the lowest error the camera-based columns can reach. Best in bold
 16.7&deg;, against 21.5&deg; after joint finetuning alone, and each phase helps on its own. A generated video follows a given
 motion closely (its camera lies 14&ndash;16&deg; from the recorded head in every model), but a generated motion barely follows
 a given video (28&ndash;31&deg;).</p>
-
 <h3>Video and motion quality</h3>
 <div class="table-wrap"><table class="results">
 <thead><tr class="span"><th></th><th></th><th colspan="2">Video FID</th><th colspan="2">Motion FD, pose</th><th colspan="2">Motion FD, velocity</th></tr>

@@ -18,6 +18,8 @@ a separate repo, `aligning-video-motion-samples` (GitHub Pages allows 1 GB per s
   `noise*.png` come from `make_explainer_assets.py` (the staircase example's video, and pixel noise).
 - `media/thesis/`: the examples' videos, from `make_thesis_scenes.py`, and their recorded motion as clips
   (`<example>__input_motion.mp4`), from `make_task_inputs.py`.
+- `media/misalignment/`: the Results section's camera-head comparison (joint finetuning alone against the final
+  model on four held-out clips, `comparison.mp4` the four in turn), from `make_misalignment_videos.py`.
 - `media/scenes/`: square clips of two examples' 3D scenes, from `make_scene_clips.py`, shown by the earlier
   three-column viewer (no longer on the page).
 - `recordings/thesis/`: the examples' viser recordings, from `make_thesis_scenes.py` (the page no longer shows them).

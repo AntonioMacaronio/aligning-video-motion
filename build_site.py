@@ -253,6 +253,14 @@ new IntersectionObserver(([e]) => {
   if (e.isIntersecting && !still && !teaser.closest(".player").dataset.held) teaser.play().catch(() => {});
   else teaser.pause();
 }).observe(teaser);
+// Figure videos (video.autoplay) play, muted and looping, while on screen; readers who ask for reduced motion get the
+// poster and the controls.
+for (const v of document.querySelectorAll("video.autoplay")) {
+  new IntersectionObserver(([e]) => {
+    if (e.isIntersecting && !still && !(v.closest(".player") || {}).dataset?.held) v.play().catch(() => {});
+    else v.pause();
+  }, { threshold: 0.25 }).observe(v);
+}
 // Players (div.player): a round play/pause button and a track that seeks (click or drag; the arrow keys step 2 s), and a
 // click on the video pauses or plays it. A video the reader paused stays paused when it comes back into view (data-held).
 for (const player of document.querySelectorAll(".player")) {
@@ -316,7 +324,13 @@ addEventListener("resize", placeToc);
 placeToc();"""
 
 MAIN = (site / "post_template.html").read_text()
-slots = {"<!--STAGE-->": TEASER, "<!--FOOTER-->": FOOTER, "<!--SCRIPT-->": PAGE_JS}
+# The Results section's camera-head comparison (make_misalignment_videos.py): four clips, one after another.
+COMPARISON = player('<video class="autoplay" src="media/misalignment/comparison.mp4" '
+                    'poster="media/misalignment/comparison.jpg" width="1920" height="1080" muted loop playsinline '
+                    'preload="metadata" aria-label="Joint finetuning alone against the final model on four held-out '
+                    'clips: where the generated head looks against where the generated video\'s camera looks"></video>',
+                    segments=4, extra=" below")   # its last row reaches the video's bottom edge
+slots = {"<!--STAGE-->": TEASER, "<!--COMPARISON-->": COMPARISON, "<!--FOOTER-->": FOOTER, "<!--SCRIPT-->": PAGE_JS}
 for slot, value in slots.items():
     assert MAIN.count(slot) == 1, slot
     MAIN = MAIN.replace(slot, value)

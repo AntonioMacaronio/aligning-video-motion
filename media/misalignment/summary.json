@@ -1,0 +1,58 @@
+{
+ "20230907_s0_margaret_mccormick_act2_mgk2q0_00020": {
+  "acont_12500": {
+   "mean_deg": 29.6,
+   "evaluation_deg": 30.07005500793457,
+   "head_turn_deg": 63.7,
+   "camera_turn_deg": -38.1
+  },
+  "k2b_12500": {
+   "mean_deg": 6.9,
+   "evaluation_deg": 6.487553119659424,
+   "head_turn_deg": 12.6,
+   "camera_turn_deg": -1.6
+  }
+ },
+ "20231010_s0_albert_hammond_act2_op7b8a_00149": {
+  "acont_12500": {
+   "mean_deg": 35.1,
+   "evaluation_deg": 35.98434829711914,
+   "head_turn_deg": 10.0,
+   "camera_turn_deg": 107.3
+  },
+  "k2b_12500": {
+   "mean_deg": 10.6,
+   "evaluation_deg": 10.594792366027832,
+   "head_turn_deg": -0.5,
+   "camera_turn_deg": 15.2
+  }
+ },
+ "20230907_s0_margaret_mccormick_act1_rwed0h_00169": {
+  "acont_12500": {
+   "mean_deg": 50.8,
+   "evaluation_deg": 58.42559051513672,
+   "head_turn_deg": -56.3,
+   "camera_turn_deg": -137.4
+  },
+  "k2b_12500": {
+   "mean_deg": 19.3,
+   "evaluation_deg": 25.709196090698242,
+   "head_turn_deg": -135.5,
+   "camera_turn_deg": -146.6
+  }
+ },
+ "20231010_s1_cheryl_johnson_act2_xssrc8_00145": {
+  "acont_12500": {
+   "mean_deg": 65.7,
+   "evaluation_deg": 60.977962493896484,
+   "head_turn_deg": -452.0,
+   "camera_turn_deg": -138.2
+  },
+  "k2b_12500": {
+   "mean_deg": 23.4,
+   "evaluation_deg": 23.11785888671875,
+   "head_turn_deg": -493.8,
+   "camera_turn_deg": -459.9
+  }
+ }
+}
