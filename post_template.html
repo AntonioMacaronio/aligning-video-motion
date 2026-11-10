@@ -61,32 +61,39 @@ pre { background: #f6f8fa; border: 1px solid var(--rule); border-radius: 6px; pa
 footer { font-size: 13.5px; color: var(--muted); text-align: center; max-width: var(--text); margin: 64px auto 40px; padding: 0 20px; }
 /* The contents list, in the left margin when the window is wide enough (40 px left of the text, at least 16 px from the
    window's edge); it fades while a wide element passes it. */
-.toc { position: fixed; top: 96px; left: max(16px, calc(50vw - var(--text) / 2 - 215px)); width: 175px; font-size: 12.5px; line-height: 1.4; transition: opacity 0.2s; display: none; }
+.toc { position: fixed; top: 96px; left: max(16px, calc((50vw - var(--text) / 2 - 175px) / 2)); width: 175px; font-size: 12.5px; line-height: 1.4; transition: opacity 0.2s; display: none; }
 .toc b { display: block; font-size: 13.5px; margin-bottom: 8px; }
 .toc a { display: block; color: var(--muted); padding: 3px 0 3px 9px; border-left: 2px solid transparent; }
 .toc a.sub { padding-left: 19px; font-size: 12px; }
 .toc a.current { color: var(--ink); border-left-color: var(--link); }
 @media (min-width: 1310px) { .toc { display: block; } }
 /* It appears once the reader has scrolled past the thesis figures viewer, which can then use the full width. */
-.toc.away { opacity: 0; pointer-events: none; }
-/* The thesis figures: the three tasks side by side (build_site.py's SIMPLE), each a heading over two square videos,
-   the given one, an arrow and the generated one. They may be wider than the side columns (they span the window, less
-   20 px each side). */
+.toc.away, .toc.dim { opacity: 0; pointer-events: none; }
+/* It is centred in the left margin; while an element wider than the text column (the explainer) passes beside it and
+   would touch it, it fades (.dim, set by the page's script). */
+/* The teaser (build_site.py's TEASER): one video under the title, as wide as the window allows (less 20 px each side). */
 main > .wide.viewer { grid-column: full; padding: 0 20px; }
-.simple-grid { max-width: 1400px; margin: 8px auto 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 44px; }
-.simple-head { font-size: 17px; font-weight: 600; line-height: 1.35; text-align: center; color: var(--ink); margin: 0 0 12px; }
-.simple-pair { display: grid; grid-template-columns: minmax(0, 1fr) 34px minmax(0, 1fr); align-items: center; }
-.simple-pair video { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; box-sizing: border-box; border-radius: 8px; }
-.simple-pair .scene-clip, .simple-pair .motion-clip { border: 1px solid #e3e3e3; background: #fff; }
-/* while the three-tasks figure below plays one task, the other two columns fade (build_site.py's followFigure); not on
-   phones, where the columns stack and the figure is far below them */
-.simple-col { transition: opacity 0.35s; }
-@media (min-width: 901px) { .simple-grid.focus .simple-col:not(.on) { opacity: 0.28; } }
-.pair-arrow { height: 16px; margin: 0 4px; background: no-repeat right center / 10px 16px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 16'%3E%3Cpath d='M2 3.5 6.5 8 2 12.5' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"),
-  no-repeat left center / calc(100% - 3px) 2px linear-gradient(#64748b, #64748b); }
-@media (max-width: 900px) { .simple-grid { grid-template-columns: minmax(0, 1fr); gap: 28px; } .simple-col { width: 100%; max-width: 540px; margin: 0 auto; } }
-/* the given and generated videos: framed in the time ramp's color (the page's script sets it) */
-video.clip { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; border: 6px solid rgb(46,184,114); border-radius: 6px; background: #000; }
+.teaser-player { max-width: 1400px; margin: 8px auto 0; }
+video.teaser { aspect-ratio: 2 / 1; background: #fff; }
+/* The page's video player (build_site.py's player()): the browser's controls give way to a round play/pause button and a
+   slim track that seeks, shown on hover, while paused, and always on touch screens. A segmented track has one part per
+   segment of the video. */
+.player { position: relative; }
+.player video { display: block; width: 100%; height: auto; cursor: pointer; }
+.player-bar { position: absolute; left: 14px; right: 14px; bottom: 12px; display: flex; align-items: center; gap: 12px; opacity: 0; transition: opacity 0.2s; }
+.player:hover .player-bar, .player:focus-within .player-bar, .player.paused .player-bar { opacity: 1; }
+@media (hover: none) { .player-bar { opacity: 1; } }
+.player-toggle { flex: none; width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 1px solid #d0d7de; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  background: #fff no-repeat center / 12px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 1.5v9M9 1.5v9' stroke='%23475569' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E"); }
+.player.paused .player-toggle { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 1.5l7 4.5-7 4.5z' fill='%23475569'/%3E%3C/svg%3E"); }
+.player-toggle:hover { background-color: #f3f4f6; }
+.player-track { position: relative; flex: 1; height: 18px; cursor: pointer; touch-action: none; outline: none; }
+.player-track::before, .player-fill { content: ""; position: absolute; left: 0; top: 7px; height: 4px; border-radius: 2px; transition: top 0.15s, height 0.15s; }
+.player-track::before { right: 0; background: rgba(100, 116, 139, 0.28); }
+.player-fill { width: 0; background: var(--link); }
+.player-track:hover::before, .player-track:hover .player-fill, .player-track:focus-visible::before, .player-track:focus-visible .player-fill { top: 6px; height: 6px; border-radius: 3px; }
+.player-track[data-segments] { -webkit-mask-image: repeating-linear-gradient(to right, #000 0 calc(100% / var(--segments) - 4px), transparent calc(100% / var(--segments) - 4px) calc(100% / var(--segments)));
+  mask-image: repeating-linear-gradient(to right, #000 0 calc(100% / var(--segments) - 4px), transparent calc(100% / var(--segments) - 4px) calc(100% / var(--segments))); }
 @media (max-width: 600px) { body { font-size: 16px; } .title h1 { font-size: 30px; } }
 </style></head><body>
 

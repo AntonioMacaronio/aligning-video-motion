@@ -5,8 +5,8 @@
 source_svg is the thesis's figure-src/architecture-20261024/make_fig_tasks.py output, the drawing the JPEG is rendered
 from. The clip's frames (the video-conditioned row's given video) and its bodies (the motion-conditioned row's given
 motion) are taken from it. The overlay is a transparent SVG in the drawing's coordinates, cropped to the JPEG's view
-box plus PAD. The page lays it over the JPEG in an <object> (so that its script can read the animation's clock and
-light up the matching task at the top); the animation itself is SVG's (<animate>), no script. Readers who ask for reduced
+box plus PAD. The page lays it over the JPEG in an <object> (whose clock a script can read: the earlier three-column
+viewer lit up the matching task with it); the animation itself is SVG's (<animate>), no script. Readers who ask for reduced
 motion don't get the overlay (the page's CSS hides it). Layout constants are make_fig_tasks.py's, and check_layout()
 compares them with the source.
 

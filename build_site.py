@@ -4,11 +4,9 @@
 
 The project page (<site repo>, https://antoniomacaronio.github.io/aligning-video-motion/): index.html, a blog-style
 write-up of the thesis rendered from post_template.html (its prose, the thesis figures that make_post_figures.py renders
-into figures/, and the Chapter 4 tables). Under the title, the three tasks sit side by side, one Section 4.4 thesis
-figure each (SIMPLE), as plain looping videos: the given modality, an arrow, the generated one. Their sources are
-make_thesis_scenes.py's videos (media/thesis/), make_task_inputs.py's clips of the recorded motion and
-make_scene_clips.py's square clips of the 3D scenes (media/scenes/); thesis_examples.json has the examples. gallery.html
-redirects old links to the gallery, and #results to the page's Results section.
+into figures/, and the Chapter 4 tables). Under the title plays a teaser video, media/teaser.mp4 from make_teaser.py:
+the three tasks, one Section 4.4 thesis figure each, as inputs -> MM-DiT -> outputs. gallery.html redirects old links
+to the gallery, and #results to the page's Results section.
 The gallery (<samples repo>, https://antoniomacaronio.github.io/aligning-video-motion-samples/): index.html, the
 gallery's 64 clips rewritten for an outside reader (a header in the thesis's terms, without internal paths, commit
 hashes or run codenames; tab labels; a link back to the project page), its viser recordings, and its videos re-encoded
@@ -17,7 +15,7 @@ each site at 1 GB.
 
 In the gallery a 3D scene loads, and the videos beside it play, only while its row is fully on screen, or fills the
 screen when it is taller than it; the videos then follow the scene's playback clock (the viewer's timeline, read from
-the same-origin iframe: video frame k is motion frame 3k). On the project page the videos follow one clock instead.
+the same-origin iframe: video frame k is motion frame 3k).
 """
 import html
 import json
@@ -237,82 +235,67 @@ for video in sorted((site / "media" / "thesis").glob("*.mp4")):
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(video), "-frames:v", "1", "-q:v", "3", str(poster)], check=True)
 
 
-# The viewer: the three tasks side by side, one thesis figure each, as plain looping videos: the given modality, an
-# arrow, the generated one (the first task generates both, so it has no arrow). The 3D scenes are make_scene_clips.py's
-# square clips; the given motion is make_task_inputs.py's clip of the recorded motion.
-SIMPLE = (("joint_1", "Generates video and motion"),             # in the three-tasks figure's order, which they follow
-          ("video_cond_3", "Given video, generates motion"),
-          ("motion_cond_1", "Given motion, generates video"))
+# The viewer: one teaser video (make_teaser.py): the three tasks, one thesis figure each, as inputs -> MM-DiT -> outputs.
+def player(video, segments=None, extra=""):
+    """A <video> (without the browser's controls) in the page's player: a play/pause button and a seek track, with one
+    part per segment when `segments` is given."""
+    parts = f' data-segments="{segments}"' if segments else ""
+    return (f'<div class="player{extra}">{video}<div class="player-bar">'
+            f'<button type="button" class="player-toggle" aria-label="Pause"></button>'
+            f'<div class="player-track" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0"{parts}>'
+            f'<div class="player-fill"></div></div></div></div>')
 
 
-def simple_column(name, heading):
-    mode = next(e for e in examples if e["name"] == name)["mode"]
-    video = (f'<video class="clip" src="media/thesis/{name}.mp4" poster="media/thesis/{name}.jpg" muted playsinline '
-             f'preload="auto"></video>')
-    scene = (f'<video class="scene-clip" data-fps="30" src="media/scenes/{name}.mp4" poster="media/scenes/{name}.jpg" '
-             f'muted playsinline preload="auto"></video>')
-    motion = (f'<video class="motion-clip" src="media/thesis/{name}__input_motion.mp4" '
-              f'poster="media/thesis/{name}__input_motion.jpg" muted playsinline preload="auto"></video>')
-    arrow = '<span class="pair-arrow" aria-hidden="true"></span>'
-    left, middle, right = {"joint": (video, '<span></span>', scene), "motion_cond": (motion, arrow, video),
-                           "video_cond": (video, arrow, scene)}[mode]
-    return (f'<div class="simple-col" role="group" aria-label="{heading}"><p class="simple-head">{heading}</p>'
-            f'<div class="simple-pair">{left}{middle}{right}</div></div>')
+TEASER = player('<video class="teaser" src="media/teaser.mp4" poster="media/teaser.jpg" width="2880" height="1440" muted '
+                'loop playsinline preload="auto" aria-label="The three tasks, one thesis figure each: the inputs pass into '
+                'the MM-DiT, which generates video and motion, motion from a recorded video, or video from a recorded '
+                'motion"></video>', segments=3, extra=" teaser-player")   # one segment per task
 
 
-# The three-tasks figure's animation schedule (tasks_animation.py), which the three tasks at the top follow.
-from tasks_animation import LOOP as _TASK_LOOP, PHASE as _TASK_PHASE, SPEED as _TASK_SPEED  # noqa: E402
-TASK_CLOCK = f"const TASK_PHASE = {_TASK_PHASE}, TASK_SPEED = {_TASK_SPEED}, TASK_LOOP = {_TASK_LOOP};\n"
-PAGE_JS = """const RAMP = [[46, 184, 114], [52, 136, 219], [142, 68, 173]];
-function ramp(f) {
-  const x = Math.min(Math.max(f, 0), 1) * (RAMP.length - 1), i = Math.min(Math.floor(x), RAMP.length - 2), t = x - i;
-  return "rgb(" + RAMP[i].map((c, k) => Math.round(c + t * (RAMP[i + 1][k] - c))).join(",") + ")";
-}
-// The three tasks: every video follows one clock of LOOP seconds, so they all loop in step. A 10 fps video shows frame
-// floor(10 t) and a 30 fps scene clip frame floor(30 t) (video frame k is motion frame 3k), and a video's frame takes the
-// body's color at that moment. They run while on screen, and hold their first frame for readers who ask for reduced
-// motion.
-const LOOP = (LAST_FRAME + 1) / VIDEO_FPS, simple = document.querySelector(".simple-grid");
-const clips = [...simple.querySelectorAll("video")], still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-let start = null, running = false, onScreen = false;
-function show(t) {
-  for (const v of clips) {
-    if (v.readyState < 1) continue;
-    const fps = +(v.dataset.fps || VIDEO_FPS), k = Math.min(Math.floor(t * fps + 1e-6), Math.round(v.duration * fps) - 1);
-    if (k !== +v.dataset.shown) { v.currentTime = (k + 0.5) / fps; v.dataset.shown = k; }
-  }
-  const color = ramp(sceneFrame(t) / LAST_FRAME);
-  for (const v of simple.querySelectorAll("video.clip")) v.style.borderColor = color;
-}
-// The three tasks also follow the three-tasks figure below, reading its overlay's animation clock from the same-origin
-// <object>: while the figure plays a task (its rows, in the columns' order: joint generation, video-conditioned motion,
-// motion-conditioned video), that task's column stays and the other two fade; in the figure's pause all three show.
-const columns = [...simple.querySelectorAll(".simple-col")];
-const tasksFigure = document.querySelector('object.anim[data$="arch_tasks_anim.svg"]');
-function followFigure() {
-  let active = -1;
-  try {
-    const svg = tasksFigure && tasksFigure.contentDocument && tasksFigure.contentDocument.documentElement;
-    if (svg && svg.getCurrentTime) {
-      const t = (svg.getCurrentTime() * TASK_SPEED) % TASK_LOOP, row = Math.floor(t / TASK_PHASE);   // schedule units
-      if (row < 3 && t - row * TASK_PHASE < TASK_PHASE - 0.25) active = row;
-    }
-  } catch (error) { /* not loaded yet */ }
-  simple.classList.toggle("focus", active >= 0);
-  columns.forEach((c, i) => c.classList.toggle("on", i === active));
-}
-function frame(now) {
-  if (start === null) start = now;
-  show(((now - start) / 1000) % LOOP);
-  followFigure();
-  if (onScreen) requestAnimationFrame(frame);
-  else running = false;
-}
+PAGE_JS = """// The teaser plays, muted and looping, while it is on screen; readers who ask for reduced motion get its first frame
+// and its controls.
+const teaser = document.querySelector("video.teaser"), still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 new IntersectionObserver(([e]) => {
-  onScreen = e.isIntersecting;
-  if (onScreen && !still && !running) { running = true; requestAnimationFrame(frame); }
-}).observe(simple);
-clips.forEach((v) => v.addEventListener("loadedmetadata", () => { if (!running) show(0); }));
+  if (e.isIntersecting && !still && !teaser.closest(".player").dataset.held) teaser.play().catch(() => {});
+  else teaser.pause();
+}).observe(teaser);
+// Players (div.player): a round play/pause button and a track that seeks (click or drag; the arrow keys step 2 s), and a
+// click on the video pauses or plays it. A video the reader paused stays paused when it comes back into view (data-held).
+for (const player of document.querySelectorAll(".player")) {
+  const v = player.querySelector("video"), toggle = player.querySelector(".player-toggle");
+  const track = player.querySelector(".player-track"), fill = player.querySelector(".player-fill");
+  const sync = () => { player.classList.toggle("paused", v.paused); toggle.setAttribute("aria-label", v.paused ? "Play" : "Pause"); };
+  v.addEventListener("play", sync);
+  v.addEventListener("pause", sync);
+  sync();
+  const flip = () => {
+    if (v.paused) { delete player.dataset.held; v.play().catch(() => {}); }
+    else { player.dataset.held = "1"; v.pause(); }
+  };
+  toggle.addEventListener("click", flip);
+  v.addEventListener("click", flip);
+  if (track.dataset.segments) track.style.setProperty("--segments", track.dataset.segments);
+  const seek = (e) => {
+    const r = track.getBoundingClientRect();
+    if (v.duration) v.currentTime = Math.min(Math.max((e.clientX - r.left) / r.width, 0), 0.999) * v.duration;
+  };
+  track.addEventListener("pointerdown", (e) => { seek(e); track.setPointerCapture(e.pointerId); });
+  track.addEventListener("pointermove", (e) => { if (track.hasPointerCapture(e.pointerId)) seek(e); });
+  track.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    e.preventDefault();
+    v.currentTime = Math.min(Math.max(v.currentTime + (e.key === "ArrowRight" ? 2 : -2), 0), v.duration || 0);
+  });
+  const show = () => {
+    if (v.duration) {
+      fill.style.width = `${100 * v.currentTime / v.duration}%`;
+      track.setAttribute("aria-valuenow", String(Math.round(v.currentTime)));
+      track.setAttribute("aria-valuemax", String(Math.round(v.duration)));
+    }
+    requestAnimationFrame(show);
+  };
+  requestAnimationFrame(show);
+}
 // Contents: mark the section being read; the list appears once the reader has scrolled past the thesis figures viewer.
 const tocLinks = [...document.querySelectorAll(".toc a")];
 const tocTargets = tocLinks.map((a) => document.getElementById(a.hash.slice(1)));
@@ -324,14 +307,22 @@ function markToc() {
 addEventListener("scroll", markToc, { passive: true });
 markToc();
 const toc = document.querySelector(".toc"), viewer = document.getElementById("examples");
-function placeToc() { toc.classList.toggle("away", viewer.getBoundingClientRect().bottom > 96); }   // 96 px: the list's top
+const wide = [...document.querySelectorAll("main > .wide")].filter((w) => w !== viewer);
+function placeToc() {
+  toc.classList.toggle("away", viewer.getBoundingClientRect().bottom > 96);   // 96 px: the list's top
+  // fade while a wide element (one with content wider than the text column) reaches into the list's box
+  const t = toc.getBoundingClientRect();
+  toc.classList.toggle("dim", wide.some((w) => [...w.children].some((c) => {
+    const r = c.getBoundingClientRect();
+    return r.width && r.left < t.right + 12 && r.top < t.bottom + 12 && r.bottom > t.top - 12;
+  })));
+}
 addEventListener("scroll", placeToc, { passive: true });
 addEventListener("resize", placeToc);
 placeToc();"""
 
 MAIN = (site / "post_template.html").read_text()
-slots = {"<!--STAGE-->": '<div class="simple-grid">' + "".join(simple_column(*c) for c in SIMPLE) + "</div>",
-         "<!--FOOTER-->": FOOTER, "<!--SCRIPT-->": SYNC_JS + TASK_CLOCK + PAGE_JS}
+slots = {"<!--STAGE-->": TEASER, "<!--FOOTER-->": FOOTER, "<!--SCRIPT-->": PAGE_JS}
 for slot, value in slots.items():
     assert MAIN.count(slot) == 1, slot
     MAIN = MAIN.replace(slot, value)
