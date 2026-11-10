@@ -5,8 +5,8 @@
 The project page (<site repo>, https://antoniomacaronio.github.io/aligning-video-motion/): index.html, a blog-style
 write-up of the thesis rendered from post_template.html (its prose, the thesis figures that make_post_figures.py renders
 into figures/, and the Chapter 4 tables). Under the title plays a teaser video, media/teaser.mp4 from make_teaser.py:
-the three tasks, one Section 4.4 thesis figure each, as inputs -> MM-DiT -> outputs. gallery.html redirects old links
-to the gallery, and #results to the page's Results section.
+the three tasks, one Section 4.4 thesis figure each, as inputs -> MM-DiT -> outputs. gallery.html, the header's Gallery
+link, shows the twelve thesis figures, each under all three tasks, and links on to the 64-clip gallery.
 The gallery (<samples repo>, https://antoniomacaronio.github.io/aligning-video-motion-samples/): index.html, the
 gallery's 64 clips rewritten for an outside reader (a header in the thesis's terms, without internal paths, commit
 hashes or run codenames; tab labels; a link back to the project page), its viser recordings, and its videos re-encoded
@@ -222,12 +222,6 @@ s = s.replace(old, f'if (location.hash === "#results") location.replace("{FIGURE
     "the files here by hand.\n")
 
 # ---------------------------------------------------------------- the project page
-(site / "gallery.html").write_text(
-    '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Gallery</title>'
-    f'<meta http-equiv="refresh" content="0; url={SAMPLES_URL}">'
-    f'<script>location.replace(location.hash === "#results" ? "{FIGURES_URL}#results" : "{SAMPLES_URL}" + location.hash);'
-    f'</script></head><body><p>The gallery moved to <a href="{SAMPLES_URL}">{SAMPLES_URL}</a>.</p></body></html>\n')
-
 examples = json.loads((site / "thesis_examples.json").read_text())
 for video in sorted((site / "media" / "thesis").glob("*.mp4")):
     poster = video.with_suffix(".jpg")
@@ -327,7 +321,7 @@ for slot, value in slots.items():
     assert MAIN.count(slot) == 1, slot
     MAIN = MAIN.replace(slot, value)
 assert MAIN.count("<!--GALLERY_URL-->") == 1, MAIN.count("<!--GALLERY_URL-->")
-MAIN = MAIN.replace("<!--GALLERY_URL-->", SAMPLES_REL)
+MAIN = MAIN.replace("<!--GALLERY_URL-->", "gallery.html")   # the twelve thesis figures, each under all three tasks
 assert not re.search(r"<!--[A-Z_:a-z]+-->", MAIN), "unfilled slot"
 # Animated overlays (make_post_figures.py's OVERLAID) reach data-pad drawing units past their figure on every side;
 # extend each overlay (<object class="anim">) past the figure's box by as much, in percent of that box.
@@ -342,6 +336,152 @@ def _place_overlay(m):
 
 MAIN = re.sub(r'<object class="anim" data="(figures/[^"]+_anim\.svg)"', _place_overlay, MAIN)
 (site / "index.html").write_text(MAIN)
+
+
+# ---------------------------------------------------------------- the gallery (gallery.html)
+# The header's Gallery link: the twelve Section 4.4 examples, each a card with a tab per task (figures_template.html).
+TASKS = {
+    "joint": dict(label="Generate both", inputs=("frame", "pose"),
+                  outputs=(("video", "generated video"),
+                           ("scene", "generated motion, inside the generated video&rsquo;s 3D reconstruction"))),
+    "motion_cond": dict(label="Video from motion", inputs=("frame", "motion"),
+                        outputs=(("video", "generated video"),
+                                 ("scene", "<b>input</b> motion, inside the generated video&rsquo;s 3D reconstruction"))),
+    "video_cond": dict(label="Motion from video", inputs=("video", "pose"),
+                       outputs=(("scene", "generated motion, inside the recorded video&rsquo;s 3D reconstruction"),)),
+}
+
+
+def pane(e, task, active):
+    """One task of an example, read left to right: its inputs (the text prompt, and the first frame or the recorded
+    video, and the first pose or the recorded motion), an arrow, and its outputs (the generated video, and the 3D
+    scene with the generated motion, or the generated video's reconstruction around the input motion)."""
+    name = e["name"] if task == e["mode"] else f"{e['name']}__{task}"
+    recorded = e["name"] if e["mode"] == "video_cond" else f"{e['name']}__video_cond"   # its video is the recording
+    info = json.loads((site / "recordings" / "thesis" / f"{name}.json").read_text())
+    # The site camera frames the content like the figure's tight crop (make_thesis_scenes.site_camera). Without a
+    # field of view the viewer would use three.js's 75 deg, wider than the figure's 50.
+    position, look_at = info.get("site_position", info["position"]), info.get("site_look_at", info["look_at"])
+    camera = (f"initialCameraPosition={','.join(map(str, position))}"
+              f"&amp;initialCameraLookAt={','.join(map(str, look_at))}&amp;initialCameraUp=0,0,1"
+              f"&amp;initialCameraFov={info.get('site_fov', info['fov']):.4f}")
+    t = TASKS[task]
+    clip = (f'<video class="clip" src="media/thesis/{name}.mp4" poster="media/thesis/{name}.jpg" muted loop playsinline '
+            f'preload="none"></video>')
+    tiles = {
+        "frame": ("first frame", f'<img src="media/thesis/{recorded}.jpg" alt="" loading="lazy">'),
+        "pose": ("first pose", f'<img src="media/thesis/{e["name"]}__input_motion.jpg" alt="" loading="lazy">'),
+        "motion": ("motion (recorded)", f'<video class="aux" src="media/thesis/{e["name"]}__input_motion.mp4" '
+                   f'poster="media/thesis/{e["name"]}__input_motion.jpg" muted loop playsinline preload="none"></video>'),
+        "video": ("video (recorded)", clip),
+    }
+    inputs = "".join(f'<figure class="tile tile-{kind}">{tiles[kind][1]}<figcaption>{tiles[kind][0]}</figcaption></figure>'
+                     for kind in t["inputs"])
+    scene = (f'<div class="scene"><div class="hint">loading the 3D scene&hellip;</div>'
+             f'<iframe data-src="viser/index.html?playbackPath=../recordings/thesis/{name}.viser&amp;{camera}" '
+             f'title="{html.escape(e["title"])}: {t["label"].lower()}"></iframe></div>')
+    outputs = "".join(f'<figure class="out out-{kind}">{clip if kind == "video" else scene}<figcaption>{label}</figcaption>'
+                      f'</figure>' for kind, label in t["outputs"])
+    # Every task uses the same columns: the inputs (one size on every tab, the prompt in a box sized for the longest
+    # caption), an arrow, the generated video (square) and the 3D scene (aspect `aspect`), so the video and the scene
+    # come out the same height and nothing moves between tabs. A task without a generated video stretches its arrow
+    # across that column.
+    long = " long" if all(kind != "video" for kind, _ in t["outputs"]) else ""
+    columns = f"var(--inputs) 34px minmax(0, 1fr) minmax(0, {info['aspect']:.3f}fr)"
+    return (f'<div class="pane" data-task="{task}"{"" if active else " hidden"}>'
+            f'<div class="io {task}" style="--aspect: {info["aspect"]:.3f}; grid-template-columns: {columns}">'
+            f'<p class="side-label">Inputs</p><p class="side-label outputs">Outputs</p>'
+            f'<div class="inputs"><p class="prompt">&ldquo;{html.escape(e["caption"])}&rdquo;</p>'
+            f'<div class="tiles">{inputs}</div></div>'
+            f'<div class="arrow{long}" aria-hidden="true"></div>{outputs}</div></div>')
+
+
+def card(e, shown, opens=None):
+    """One example: its title (on the card's top edge), a tab per task and a pane per task, open on `opens` (default:
+    its figure's task, which its tab marks)."""
+    mode, opens = e["mode"], opens or e["mode"]
+    tabs = "".join(
+        f'<button role="tab" data-task="{task}" aria-selected="{"true" if task == opens else "false"}">{t["label"]}'
+        f'{" <span class=fig-mark>thesis figure</span>" if task == mode else ""}</button>' for task, t in TASKS.items())
+    return (f'<div class="example" id="{e["name"]}"{"" if shown else " hidden"}><h4>{html.escape(e["title"])}</h4>'
+            f'<div class="tabs" role="tablist">{tabs}</div>'
+            + "".join(pane(e, task, task == opens) for task in TASKS) + "</div>")
+
+
+FIGURES_JS = """const RAMP = [[46, 184, 114], [52, 136, 219], [142, 68, 173]];
+function ramp(f) {
+  const x = Math.min(Math.max(f, 0), 1) * (RAMP.length - 1), i = Math.min(Math.floor(x), RAMP.length - 2), t = x - i;
+  return "rgb(" + RAMP[i].map((c, k) => Math.round(c + t * (RAMP[i + 1][k] - c))).join(",") + ")";
+}
+const MAX_LIVE = 3, live = [];
+function unload(frame) {
+  const i = live.indexOf(frame);
+  if (i >= 0) live.splice(i, 1);
+  if (frame.dataset.loaded === "1") { frame.src = "about:blank"; frame.dataset.loaded = "0"; }
+  frame.previousElementSibling.style.display = "";
+}
+function load(frame) {
+  if (frame.dataset.loaded === "1") { live.splice(live.indexOf(frame), 1); live.push(frame); return; }
+  frame.src = frame.dataset.src; frame.dataset.loaded = "1"; frame.previousElementSibling.style.display = "none";
+  live.push(frame);
+  while (live.length > MAX_LIVE) unload(live[0]);
+}
+// One entry per task pane; only each card's selected pane is displayed, so only it can become visible. Its scene
+// loads, and its videos play, while any of it is on screen; at most MAX_LIVE scenes are live at once.
+const panes = [...document.querySelectorAll(".pane")].map((pane) => ({
+  pane, body: pane.querySelector(".io"), videos: [...pane.querySelectorAll("video")], frame: pane.querySelector("iframe"),
+  on: false,
+}));
+function setOn(p, on) {
+  if (p.on === on) return;
+  p.on = on;
+  p.videos.forEach((v) => { v.dataset.shown = -1; });
+  if (on) { load(p.frame); p.videos.forEach(startVideo); }
+  else { unload(p.frame); p.videos.forEach((v) => v.pause()); }
+}
+const observer = new IntersectionObserver((entries) => entries.forEach((e) => {
+  const p = panes.find((x) => x.body === e.target);
+  if (p) setOn(p, !p.pane.hidden && e.intersectionRatio > 0);
+}), { threshold: THRESHOLDS });
+panes.forEach((p) => observer.observe(p.body));
+document.querySelectorAll(".example").forEach((example) => {
+  example.querySelectorAll('.tabs [role="tab"]').forEach((tab) => tab.addEventListener("click", () => {
+    example.querySelectorAll('.tabs [role="tab"]').forEach((b) => b.setAttribute("aria-selected", String(b === tab)));
+    for (const p of panes) {
+      if (!example.contains(p.pane)) continue;
+      const selected = p.pane.dataset.task === tab.dataset.task;
+      if (!selected) setOn(p, false);
+      p.pane.hidden = !selected;
+    }
+  }));
+});
+function tick() {
+  for (const p of panes) {
+    if (!p.on) continue;
+    const t = sceneTime(p.frame);
+    for (const v of p.videos) {
+      if (t !== null && v.readyState >= 1) {
+        if (!v.paused) v.pause();
+        const k = sceneFrame(t);
+        if (k !== +v.dataset.shown) { v.currentTime = (k + 0.5) / VIDEO_FPS; v.dataset.shown = k; }
+        if (v.classList.contains("clip")) v.style.borderColor = ramp(k / LAST_FRAME);  // the body's color at motion frame 3k
+      } else {
+        if (v.readyState === 0 && v.networkState !== HTMLMediaElement.NETWORK_LOADING) startVideo(v);
+        if (v.duration && v.classList.contains("clip")) v.style.borderColor = ramp(v.currentTime / v.duration);
+      }
+    }
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);"""
+FIGURES = (site / "figures_template.html").read_text()
+for slot, value in {"<!--CARDS-->": "\n".join(card(e, True) for e in examples), "<!--SAMPLES_URL-->": SAMPLES_REL,
+                    "<!--SCRIPT-->": SYNC_JS + FIGURES_JS}.items():
+    assert FIGURES.count(slot) == 1, slot
+    FIGURES = FIGURES.replace(slot, value)
+assert not re.search(r"<!--[A-Z_:a-z]+-->", FIGURES), "unfilled slot"
+(site / "gallery.html").write_text(FIGURES)
+print("site gallery.html", len(FIGURES), "bytes")
 
 for page, text in (("samples index.html", s), ("site index.html", MAIN)):
     leftover = [p for p in (r"\bLVP\b", r"c1f6727|480f69b", r"Run [A-Z]\b", r"\bv2b\b",

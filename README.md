@@ -23,7 +23,8 @@ a separate repo, `aligning-video-motion-samples` (GitHub Pages allows 1 GB per s
 - `recordings/thesis/`: the examples' viser recordings, from `make_thesis_scenes.py` (the page no longer shows them).
 - `favicon.ico`, `favicon-32.png`, `apple-touch-icon.png`: the tab icon, a body mesh through a fisheye lens framed like an egocentric frame, from `make_favicon.py` (the gallery links to the same files).
 - `viser/`: the static viser client; each scene loads `viser/index.html?playbackPath=../recordings/thesis/<name>.viser`.
-- `gallery.html`: a redirect for old links to the gallery.
+- `gallery.html` (from `figures_template.html`): the header's Gallery link, the twelve thesis figures as cards, each
+  with a tab per task (inputs -> outputs, the 3D scene live); it links on to the 64-clip evaluation gallery.
 
 Rebuild: `python3 build_site.py <gallery dir> <this repo> <samples repo>`. Preview: serve the parent folder of both repos
 with a server that supports HTTP Range requests (video seeking needs them), then open `/aligning-video-motion/`.
