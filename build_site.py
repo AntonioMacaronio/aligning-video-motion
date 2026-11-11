@@ -26,6 +26,8 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from site_lock import lock   # every page goes out behind the password page
+
 src, site, samples = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
 for d in (site, samples):
     d.mkdir(parents=True, exist_ok=True)
@@ -214,7 +216,7 @@ old = 'showTab(location.hash.slice(1) || "training");'
 assert s.count(old) == 1
 s = s.replace(old, f'if (location.hash === "#results") location.replace("{FIGURES_URL}#results");\n' + old
               + '\naddEventListener("hashchange", () => showTab(location.hash.slice(1) || "training"));')
-(samples / "index.html").write_text(s)
+(samples / "index.html").write_text(lock(s, favicon=f"{FIGURES_URL}favicon.ico"))
 (samples / "README.md").write_text(
     "# Gallery: Aligning Egocentric Video and Human Motion Generation\n\n"
     f"The 64-clip gallery of the thesis's project page ({FIGURES_URL}), served at {SAMPLES_URL}.\n"
@@ -327,7 +329,7 @@ MAIN = (site / "post_template.html").read_text()
 # The Results section's camera-head comparison (make_misalignment_videos.py): four clips, one after another.
 COMPARISON = player('<video class="autoplay" src="media/misalignment/comparison.mp4" '
                     'poster="media/misalignment/comparison.jpg" width="1920" height="1080" muted loop playsinline '
-                    'preload="metadata" aria-label="Joint finetuning alone against the final model on four held-out '
+                    'preload="metadata" aria-label="Finetuning alone against the curriculum and post-training on four held-out '
                     'clips: where the generated head looks against where the generated video\'s camera looks"></video>',
                     segments=4, extra=" below")   # its last row reaches the video's bottom edge
 slots = {"<!--STAGE-->": TEASER, "<!--COMPARISON-->": COMPARISON, "<!--FOOTER-->": FOOTER, "<!--SCRIPT-->": PAGE_JS}
@@ -349,7 +351,7 @@ def _place_overlay(m):
 
 
 MAIN = re.sub(r'<object class="anim" data="(figures/[^"]+_anim\.svg)"', _place_overlay, MAIN)
-(site / "index.html").write_text(MAIN)
+(site / "index.html").write_text(lock(MAIN))
 
 
 # ---------------------------------------------------------------- the gallery (gallery.html)
@@ -494,7 +496,7 @@ for slot, value in {"<!--CARDS-->": "\n".join(card(e, True) for e in examples), 
     assert FIGURES.count(slot) == 1, slot
     FIGURES = FIGURES.replace(slot, value)
 assert not re.search(r"<!--[A-Z_:a-z]+-->", FIGURES), "unfilled slot"
-(site / "gallery.html").write_text(FIGURES)
+(site / "gallery.html").write_text(lock(FIGURES))
 print("site gallery.html", len(FIGURES), "bytes")
 
 for page, text in (("samples index.html", s), ("site index.html", MAIN)):

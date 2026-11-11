@@ -28,5 +28,11 @@ a separate repo, `aligning-video-motion-samples` (GitHub Pages allows 1 GB per s
 - `gallery.html` (from `figures_template.html`): the header's Gallery link, the twelve thesis figures as cards, each
   with a tab per task (inputs -> outputs, the 3D scene live); it links on to the 64-clip evaluation gallery.
 
+- `site_lock.py`: the password page. `build_site.py` writes every page (this repo's `index.html` and `gallery.html`,
+  and the samples gallery's `index.html`) encrypted, behind a page that asks for the password and decrypts it in the
+  browser. The password is kept out of the repos: `SITE_PASSWORD`, or `~/.config/aligning-video-motion/site_password`.
+  Without one the build stops; `SITE_PLAIN=1` builds unlocked pages for a local check only. To take the password
+  off for good (the paper's release), set `LOCKED = False` at the top of `site_lock.py`, rebuild and publish both repos.
+
 Rebuild: `python3 build_site.py <gallery dir> <this repo> <samples repo>`. Preview: serve the parent folder of both repos
 with a server that supports HTTP Range requests (video seeking needs them), then open `/aligning-video-motion/`.

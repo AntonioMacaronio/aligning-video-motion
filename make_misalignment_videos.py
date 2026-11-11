@@ -1,12 +1,17 @@
-"""Comparison videos for the Results section: where the generated head looks vs where the generated video's camera looks,
-for joint fine-tuning alone (A v2 continued, 12.5k) and our model (K v2b, 12.5k), on held-out clips.
+"""Comparison videos for "Why align video and motion?": where the generated head looks vs where the generated video's
+camera looks, for finetuning alone (A v2 continued, 12.5k) and with the curriculum and post-training (K v2b, 12.5k), on
+held-out clips.
 
     PYTHONPATH=<LVP tree> python make_misalignment_videos.py <eval dir> <camera-to-CPF table> <site dir> [clip ...]
 
 <eval dir> holds the grid-2 evaluation's val64 outputs for the clips (synced from
 s3://far-research-internal/antzhan/eval/motion-v2-grid2-20261020/val64/): media/<label>/<clip>_undistorted/
 {joint.mp4, meta.json, vggt.npz} and motion/<label>/<clip>_undistorted.pt, for label acont_12500 and k2b_12500. Both
-models sampled each clip from the same seed.
+models sampled each clip from the same seed. The page's comparison uses the same layout from samples drawn with the
+negative prompt in the video stream (dev node /data/sky/projects/large-video-planner/tmp/misalign-neg-20261110/:
+neg_multi.py with each clip's evaluation seed, VGGT-Omega by joint_cameras.py; on S3 under
+genvideomotion/thesis-site-scenes-20261030/misalign-neg-20261110/), with no camera/ shards, so its labels are the
+per-frame means below.
 
 The comparison is the thesis's camera-head consistency (camera_head_alignment_loss): the generated head's CPF pose on
 the 49 video frames (motion_to_geometry_head_poses, head_kimodo_v2) and VGGT-Omega's cameras on the joint video
@@ -45,8 +50,8 @@ from utils.motion_decode import motion_v2_to_joints
 EVAL, TABLE, SITE = Path(sys.argv[1]), load_camera_to_cpf_table(Path(sys.argv[2])), Path(sys.argv[3])
 CLIPS = sys.argv[4:] or ["20230907_s0_margaret_mccormick_act2_mgk2q0_00020", "20231010_s0_albert_hammond_act2_op7b8a_00149",
                          "20230907_s0_margaret_mccormick_act1_rwed0h_00169", "20231010_s1_cheryl_johnson_act2_xssrc8_00145"]
-MODELS = (("acont_12500", "Joint finetuning alone", "no curriculum,\nno post-training"),
-          ("k2b_12500", "Our final model", "+ curriculum and\ngeometric post-training"))
+MODELS = (("acont_12500", "Finetuning", ""),
+          ("k2b_12500", "Curriculum + post-training", ""))
 WIDTH, HEIGHT, FPS = 1920, 1080, 30
 SIDE, PLOT_W = 420, 640                      # px: the video and the 3D view; the plot's width
 LABEL_W, X0, ROW_Y = 330, 40, (150, 600)     # the rows' label column, the left margin, each row's top
@@ -241,7 +246,7 @@ def compose(clip, rows, renders, plot, t):
         for line in lines:
             g.text((X0, top), line, font=font(34, 1), fill=INK)
             top += 42
-        for line in subtitle.split("\n"):
+        for line in filter(None, subtitle.split("\n")):
             g.text((X0, top + 6), line, font=font(26), fill=MUTED)
             top += 32
         apart = d["official"] if d["official"] is not None else float(d["error"].mean())

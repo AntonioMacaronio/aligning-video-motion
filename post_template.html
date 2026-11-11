@@ -158,11 +158,11 @@ a video and a motion that describe different events.</p>
 recorded video and motion, the camera rotation VGGT-&Omega; recovers and the head's rotation differ by only about 4&deg;. When a
 pretrained video model is finetuned for joint generation, they differ by 22&deg; on average.</p>
 <figure><!--COMPARISON-->
-<figcaption>Four of the held-out clips where the two models differ most, each sampled from the same seed by joint
-finetuning alone (top) and by the final model (bottom). Green: where the generated head looks. Blue: where VGGT-&Omega;
-places the camera of the generated video. Right: how far each has turned since the first frame. After joint finetuning
-alone the two lie 30&ndash;61&deg; apart on these clips; the final model keeps them 6&ndash;26&deg; apart (over all 64 clips:
-21.5&deg; against 16.7&deg;).</figcaption></figure>
+<figcaption>Four of the held-out clips where the two models differ most, each sampled from the same seed and with the
+negative prompt, by finetuning alone (top) and with the curriculum and post-training (bottom). Green: where the generated
+head looks. Blue: where VGGT-&Omega; places the camera of the generated video. Right: how far each has turned since the
+first frame. After finetuning alone the two lie 25&ndash;56&deg; apart on these clips; with the curriculum and
+post-training, 10&ndash;23&deg;.</figcaption></figure>
 <p>The direct fix is to treat the frozen estimator as a differentiable reward and backpropagate through the sampler, as
 <a href="https://arxiv.org/abs/2309.17400">DRaFT</a> and <a href="https://arxiv.org/abs/2310.03739">AlignProp</a> do for
 images. For an 8B-parameter video model, that means differentiating through dozens of denoising steps, the video decoder and
